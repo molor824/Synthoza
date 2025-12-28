@@ -3,16 +3,23 @@ using Raylib_cs;
 
 namespace Synthoza;
 
-public class PianoRoll : ICameraHandle
+public class PianoRoll : IRenderHandle, ILoopHandle
 {
     public const int Octaves = 2;
-    public const float KeyDistances = 40;
+    public const float KeyDistances = 20;
     public const float WhiteKeyLength = 200;
     public const float BlackKeyLength = 120;
+
     public static readonly Color WhiteKeyColor = Color.White;
+    public static readonly Color WhiteKeyHoverColor = new(210, 210, 210, 255);
+    public static readonly Color WhiteKeyClickColor = new(180, 180, 180, 255);
+
     public static readonly Color BlackKeyColor = Color.DarkGray;
-    public static readonly int[] WhiteKeyIndices = [0, 2, 4, 5, 7, 9, 11];
-    public static readonly int[] BlackKeyIndices = [1, 3, 6, 8, 10];
+    public static readonly Color BlackKeyHoverColor = new(40, 40, 40, 255);
+    public static readonly Color BlackKeyClickColor = new(0, 0, 0, 255);
+
+    public static readonly bool[] WhiteKeys =
+        [true, false, true, false, true, true, false, true, false, true, false, true];
 
     public static readonly Color[] KeyColors =
     [
@@ -62,44 +69,77 @@ public class PianoRoll : ICameraHandle
         new(0, 1f / 3f),
     ];
 
-    private Transform _transform = Transform.FromRotation(MathF.PI / 2f);
-    private Button[] _pianoKeys;
-    private CameraPass _cameraPass;
+    private Transform _transform = Transform.Identity;
+    private Rectangle[] _pianoKeys;
 
-    public PianoRoll(CameraPass cameraPass)
+    public PianoRoll()
     {
-        _pianoKeys = new Button[Octaves * 12];
-        _cameraPass = cameraPass;
+        _pianoKeys = new Rectangle[Octaves * 12];
         var totalWidth = Octaves * 12 * KeyDistances;
-        var center = totalWidth * 0.5f;
         for (int i = 0; i < _pianoKeys.Length; i++)
         {
             var note = i % 12;
-            _pianoKeys[i] = new Button(cameraPass, KeySizes[note])
+            _pianoKeys[i] = new Rectangle(KeySizes[note])
             {
                 Anchor = KeyAnchors[note],
-                Transform = Transform.FromTranslation(new(0, center - i * KeyDistances)),
+                Transform = Transform.FromTranslation(new(0, totalWidth - i * KeyDistances)),
                 Color = KeyColors[note],
-                NormalColor = KeyColors[note],
-                HoverColor = Color.Gray,
-                ClickColor = KeyColors[note],
                 BorderWidth = 2,
                 BorderColor = Color.Black,
             };
         }
     }
 
-    public void CameraRender()
+    public void Update(float deltaTime)
     {
-        foreach (var key in _pianoKeys)
-            key.Update(_transform);
-            
-        for (int octave = 0; octave < Octaves; octave++)
+        int? hoveringKey = null;
+        var mousePosition = Raylib.GetMousePosition();
+        for (int i = 0; i < _pianoKeys.Length && hoveringKey is null; i++)
         {
-            foreach (var whiteIndex in WhiteKeyIndices)
-                _pianoKeys[octave * 12 + whiteIndex].Render(_transform);
-            foreach (var blackIndex in BlackKeyIndices)
-                _pianoKeys[octave * 12 + blackIndex].Render(_transform);
+            var note = i % 12;
+            if (!WhiteKeys[note] && _pianoKeys[i].Intersecting(_transform, mousePosition))
+                hoveringKey = i;
+        }
+
+        for (int i = 0; i < _pianoKeys.Length && hoveringKey is null; i++)
+        {
+            var note = i % 12;
+            if (WhiteKeys[note] && _pianoKeys[i].Intersecting(_transform, mousePosition))
+                hoveringKey = i;
+        }
+
+        for (int i = 0; i < _pianoKeys.Length; i++)
+        {
+            var key = _pianoKeys[i];
+            var note = i % 12;
+            if (i == hoveringKey)
+            {
+                if (Raylib.IsMouseButtonDown(MouseButton.Left))
+                    key.Color = WhiteKeys[note] ? WhiteKeyClickColor : BlackKeyClickColor;
+                else
+                    key.Color = WhiteKeys[note] ? WhiteKeyHoverColor : BlackKeyHoverColor;
+            }
+            else
+            {
+                key.Color = WhiteKeys[note] ? WhiteKeyColor : BlackKeyColor;
+            }
+        }
+    }
+
+    public void Render()
+    {
+        for (int i = 0; i < _pianoKeys.Length; i++)
+        {
+            var note = i % 12;
+            if (WhiteKeys[note])
+                _pianoKeys[i].Render(_transform);
+        }
+
+        for (int i = 0; i < _pianoKeys.Length; i++)
+        {
+            var note = i % 12;
+            if (!WhiteKeys[note])
+                _pianoKeys[i].Render(_transform);
         }
     }
 }

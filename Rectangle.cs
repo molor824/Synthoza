@@ -19,8 +19,8 @@ public class Rectangle
 
     public bool Intersecting(Transform globalTransform, Vector2 point)
     {
-        var inverse = (globalTransform * Transform).Inverse();
-        var localPoint = inverse * point;
+        var transform = globalTransform * Transform;
+        var localPoint = transform / point;
         var start = -Size * Anchor;
         var end = Size * (new Vector2(1) - Anchor);
         return localPoint.X >= start.X && localPoint.X <= end.X && localPoint.Y >= start.Y && localPoint.Y <= end.Y;

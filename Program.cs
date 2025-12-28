@@ -9,12 +9,10 @@ internal static class Program
         var app = new App("Synthoza", 1280, 720);
 
         var renderPass = new RenderPass();
-        var cameraPass = new CameraPass(app);
-        var pianoRoll = new PianoRoll(cameraPass);
+        var pianoRoll = new PianoRoll();
         
-        cameraPass.AddHandle(pianoRoll);
-        renderPass.AddHandles(cameraPass);
-        app.AddHandles(renderPass);
+        renderPass.AddHandles(pianoRoll);
+        app.AddHandles(pianoRoll, renderPass);
         
         app.Run();
         

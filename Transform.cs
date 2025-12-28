@@ -53,6 +53,14 @@ public struct Transform
         var translationComplex = a * new Complex(b.Translation.X, b.Translation.Y);
         return new(new Vector2((float)translationComplex.Real, (float)translationComplex.Imaginary), basis);
     }
+
+    public static Transform operator /(Complex a, Transform b)
+    {
+        var basis = b.Basis / a;
+        var translationComplex = new Complex(b.Translation.X, b.Translation.Y) / a;
+        return new(new Vector2((float)translationComplex.Real, (float)translationComplex.Imaginary), basis);
+    }
+    
     public static Transform operator *(Transform a, Transform b)
     {
         var transform = a.Basis * b;
@@ -63,5 +71,12 @@ public struct Transform
     {
         var complex = a.Basis * new Complex(b.X, b.Y);
         return new Vector2((float)complex.Real, (float)complex.Imaginary) + a.Translation;
+    }
+
+    public static Vector2 operator /(Transform a, Vector2 b)
+    {
+        b -= a.Translation;
+        var complex = new Complex(b.X, b.Y) / a.Basis;
+        return new((float)complex.Real, (float)complex.Imaginary);
     }
 }
