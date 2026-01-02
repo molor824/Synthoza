@@ -8,6 +8,10 @@ internal static class Program
     {
         var app = new App("Synthoza", 1280, 720);
 
+        var entityStorage = new EntityStorage();
+        var hierarchyStorage = new HierarchyStorage(entityStorage);
+        var transformStorage = new TransformStorage(entityStorage, hierarchyStorage);
+        
         var renderPass = new RenderPass();
         var pianoRoll = new PianoRoll();
         
