@@ -1,4 +1,3 @@
-using System.Reflection;
 using Raylib_cs;
 using Synthoza.Sylan;
 
@@ -6,7 +5,7 @@ namespace Synthoza;
 
 public class InstrumentTest : ILoopHandle
 {
-    private static readonly Note[] Notes = [new(3, 0, 10), new(3 + 7.0 / 12.0, 0, 10)];
+    private static readonly Note[] Notes = [new(3, 0, 100), new(3 + 7.0 / 12.0, 0, 100)];
     private const double Delta = 1.0 / 44100.0;
     private const int MaxSamples = 2048;
 
@@ -14,6 +13,7 @@ public class InstrumentTest : ILoopHandle
     private Type _instrumentType;
     private Instrument _instance;
     private AudioStream _stream;
+    private short[] _buffer = new short[MaxSamples];
 
     public InstrumentTest()
     {
@@ -29,12 +29,11 @@ public class InstrumentTest : ILoopHandle
     {
         if (Raylib.IsAudioStreamProcessed(_stream))
         {
-            short[] buffer = new short[MaxSamples];
-            for (var i = 0; i < buffer.Length; i++)
-                buffer[i] = (short)(Math.Clamp(_instance.Step(Delta, Notes) * 0.1f, -1, 1) * short.MaxValue);
+            for (var i = 0; i < _buffer.Length; i++)
+                _buffer[i] = (short)(Math.Clamp(_instance.Step(Delta, Notes) * 0.1f, -1, 1) * short.MaxValue);
             unsafe
             {
-                fixed (short* ptr = buffer)
+                fixed (short* ptr = _buffer)
                 {
                     Raylib.UpdateAudioStream(_stream, ptr, MaxSamples);
                 }
