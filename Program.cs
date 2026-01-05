@@ -19,9 +19,8 @@ internal static class Program
 
         renderPass.AddHandles(pianoRoll);
         app.AddHandles(instrumentTest, pianoRoll, renderPass);
+        app.AddDisposables(instrumentTest);
 
         app.Run();
-
-        Raylib.CloseWindow();
     }
 }

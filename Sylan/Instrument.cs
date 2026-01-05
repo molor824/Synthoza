@@ -8,20 +8,22 @@ public abstract class Instrument
     protected abstract double Frequency(double pitch, double noteElapsedTime);
     protected abstract double Wave(double timer);
 
-    public double Step(double deltaTime, IEnumerable<Note> notes)
+    private HashSet<Note> _notes = [];
+
+    public bool AddNote(Note note) => _notes.Add(note);
+    public bool RemoveNote(Note note) => _notes.Remove(note);
+
+    public double Step(double deltaTime)
     {
         DeltaTime = deltaTime;
 
         double totalWave = 0;
 
-        foreach (var note in notes)
+        foreach (var note in _notes)
         {
-            if (note.InTime(TotalElapsedTime))
-            {
-                var frequency = Frequency(note.Pitch, TotalElapsedTime - note.Start);
-                var timer = note.Step(frequency, deltaTime);
-                totalWave += Wave(timer);
-            }
+            var frequency = Frequency(note.Pitch, note.ElapsedTime);
+            note.Step(frequency, deltaTime);
+            totalWave += Wave(note.Timer);
         }
         
         TotalElapsedTime += deltaTime;
@@ -29,23 +31,15 @@ public abstract class Instrument
     }
 }
 
-public class Note(double pitch, double start, double length)
+public class Note(double pitch)
 {
-    public double Start { get; set; } = start;
-    public double Length { get; set; } = length;
     public double Pitch { get; set; } = pitch;
     public double Timer { get; private set; }
+    public double ElapsedTime { get; private set; }
 
-    public double End
+    public void Step(double frequency, double deltaTime)
     {
-        get => Start + Length;
-        set => Length = value - Start;
-    }
-
-    public bool InTime(double time) => Start <= time && time <= End;
-
-    public double Step(double frequency, double deltaTime)
-    {
-        return Timer = (Timer + frequency * deltaTime) % 1.0;
+        ElapsedTime += deltaTime;
+        Timer = (Timer + frequency * deltaTime) % 1.0;
     }
 }

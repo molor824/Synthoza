@@ -3,6 +3,20 @@ using System.Reflection.Emit;
 
 namespace Synthoza.Sylan;
 
+// NOTE TO SELF: (Incase I spend another 5 fucking hours again)
+// EXPLICITLY define overriden methods!!! (Apperently MSIL allows you to override methods with names that dont even fucking match???)
+
+// HideBySig flag indicates that method hides it's base class method's name AND *signature*. (C# Uses this flag for every method)
+// By default it hides every method with the same name.
+// Apperently its for Visual Basic... (who the fuck even uses it? I can't imagine having to deal with that BS)
+
+// BeforeFieldInit is used when you want static type to be lazily initialized. (Only when it's needed)
+// Without it, the JIT will make attempt at pre initializing based on where it *might* be used.
+// So BeforeFieldInit simply makes static lazy initialized (In fact, adding static constructor makes the type lazily initialized)
+
+// NewSlot creates new virtual method entry for the vtable. This is used when you're declaring the root virtual or abstract method.
+// Every derived overrides shouldn't have this flag!!!
+
 public class Compiler
 {
     private AssemblyBuilder _asmBuilder;
@@ -58,7 +72,7 @@ public class Compiler
 
     public Type DefineInstrumentClass(string className)
     {
-        var typeBuilder = _instModuleBuilder.DefineType(className, TypeAttributes.AutoClass | TypeAttributes.Public,
+        var typeBuilder = _instModuleBuilder.DefineType(className, TypeAttributes.AutoClass | TypeAttributes.Public | TypeAttributes.BeforeFieldInit,
             typeof(Instrument));
 
         var baseFrequencyMethod =
@@ -131,7 +145,7 @@ public class Compiler
 
         typeBuilder.DefineMethodOverride(waveMethodBuilder, baseWaveMethod);
 
-        var ctor1Builder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.HasThis,
+        var ctor1Builder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard,
             [typeof(double), typeof(double)]);
         ilGen = ctor1Builder.GetILGenerator();
         ilGen.Emit(OpCodes.Ldarg_0);
@@ -145,7 +159,7 @@ public class Compiler
             typeof(Instrument).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, [])!);
         ilGen.Emit(OpCodes.Ret);
 
-        var ctor2Builder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.HasThis, []);
+        var ctor2Builder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, []);
         ilGen = ctor2Builder.GetILGenerator();
         ilGen.Emit(OpCodes.Ldarg_0);
         ilGen.Emit(OpCodes.Ldc_R8, 0.05);

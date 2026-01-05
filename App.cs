@@ -1,4 +1,3 @@
-using System.Numerics;
 using Raylib_cs;
 
 namespace Synthoza;
@@ -6,6 +5,7 @@ namespace Synthoza;
 public class App
 {
     private List<ILoopHandle> _loopHandles = [];
+    private List<IDisposable> _disposables = [];
 
     public App(string title, int width, int height)
     {
@@ -16,6 +16,7 @@ public class App
     }
 
     public void AddHandles(params ILoopHandle[] handles) => _loopHandles.AddRange(handles);
+    public void AddDisposables(params IDisposable[] disposables) => _disposables.AddRange(disposables);
 
     public void Run()
     {
@@ -25,6 +26,12 @@ public class App
             foreach (var handle in _loopHandles)
                 handle.Update(delta);
         }
+        
+        foreach (var disposable in _disposables)
+            disposable.Dispose();
+        
+        Raylib.CloseWindow();
+        Raylib.CloseAudioDevice();
     }
 }
 
