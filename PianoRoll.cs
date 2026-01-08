@@ -82,7 +82,6 @@ public class PianoRoll : IRenderHandle, ILoopHandle
             _pianoKeys[i] = new Rectangle(KeySizes[note])
             {
                 Anchor = KeyAnchors[note],
-                Transform = Transform.FromTranslation(new(0, totalWidth - i * KeyDistances)),
                 Color = KeyColors[note],
                 BorderWidth = 2,
                 BorderColor = Color.Black,

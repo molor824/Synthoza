@@ -5,7 +5,6 @@ namespace Synthoza;
 
 public class Rectangle
 {
-    public Transform Transform = Transform.Identity;
     public Color Color = Color.White;
     public Color? BorderColor;
     public float BorderWidth;
@@ -17,18 +16,16 @@ public class Rectangle
         Size = size;
     }
 
-    public bool Intersecting(Transform globalTransform, Vector2 point)
+    public bool Intersecting(Transform transform, Vector2 point)
     {
-        var transform = globalTransform * Transform;
         var localPoint = transform / point;
         var start = -Size * Anchor;
         var end = Size * (new Vector2(1) - Anchor);
         return localPoint.X >= start.X && localPoint.X <= end.X && localPoint.Y >= start.Y && localPoint.Y <= end.Y;
     }
 
-    public void Render(Transform globalTransform)
+    public void Render(Transform transform)
     {
-        var transform = globalTransform * Transform;
         var translation = transform.Translation;
         var rotation = transform.Rotation * 180 / MathF.PI;
         var scale = transform.Scale;

@@ -1,6 +1,8 @@
+using System.Collections.Immutable;
+
 namespace Synthoza;
 
-public class HierarchyStorage
+public class HierarchyStorage : IStorage<Entity>
 {
     // Primary data
     private Dictionary<Entity, Entity> _parentMap = [];
@@ -11,15 +13,27 @@ public class HierarchyStorage
 
     public event ReparentedCallback? Reparented;
 
-    public HierarchyStorage(EntityStorage entityStorage)
+    public void DeleteEntity(Entity entity)
     {
-        entityStorage.EntityDeleted += EntityDeleted;
+        // Reparent the current entity to gracefully remove entity
+        Reparent(entity, null);
+        // Reparent each child
+        if (_childrenMap.TryGetValue(entity, out var children))
+        {
+            foreach (var child in children)
+                Reparent(child, null);
+        }
     }
 
-    public IEnumerable<Entity> GetChildren(Entity entity)
+    public void AddEntity(Entity entity, Entity parent)
+    {
+        Reparent(entity, parent);
+    }
+
+    public IReadOnlySet<Entity> GetChildren(Entity entity)
     {
         if (_childrenMap.TryGetValue(entity, out var children)) return children;
-        return Enumerable.Empty<Entity>();
+        return ImmutableHashSet<Entity>.Empty;
     }
 
     public IEnumerable<Entity> GetDescendants(Entity entity)
@@ -79,18 +93,6 @@ public class HierarchyStorage
     }
 
     public bool Reparent(Entity entity, Entity? newParent) => Reparent(entity, newParent, out _);
-
-    void EntityDeleted(Entity entity)
-    {
-        // Reparent the current entity to gracefully remove entity
-        Reparent(entity, null);
-        // Reparent each children
-        if (_childrenMap.TryGetValue(entity, out var children))
-        {
-            foreach (var child in children)
-                Reparent(child, null);
-        }
-    }
 }
 
 public class ParentNotFoundException(Entity child) : KeyNotFoundException($"No parent of {child} found")

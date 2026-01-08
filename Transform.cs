@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace Synthoza;
 
-public struct Transform
+public record struct Transform
 {
     /// <summary>
     /// Translation of transform

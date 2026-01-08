@@ -2,32 +2,57 @@ namespace Synthoza;
 
 public class EntityStorage
 {
-    public long Counter { get; private set; } = 1;
-    
-    public delegate void EntityDeletedCallback(Entity entity);
+    public long Counter => _counter;
 
-    public event EntityDeletedCallback? EntityDeleted;
-
+    private long _counter;
     private HashSet<Entity> _entities = [];
+    private Dictionary<Type, IStorage> _componentStorages = [];
 
-    public Entity CreateNew()
+    public Entity CreateNew(params object[] components)
     {
-        var entity = new Entity(Counter++);
+        var entity = new Entity(Interlocked.Increment(ref _counter));
         _entities.Add(entity);
+        foreach (var component in components)
+            _componentStorages[component.GetType()].AddEntity(entity, component);
         return entity;
     }
-    
+
+    public void AddStorage(IStorage storage) => _componentStorages[storage.ComponentType] = storage;
+
+    public void AddStorages(params IStorage[] storages)
+    {
+        foreach (var storage in storages)
+            AddStorage(storage);
+    }
     public bool ContainsEntity(Entity entity) => _entities.Contains(entity);
 
     public bool DeleteEntity(Entity entity)
     {
         if (_entities.Remove(entity))
         {
-            EntityDeleted?.Invoke(entity);
+            foreach (var storage in _componentStorages.Values)
+                storage.DeleteEntity(entity);
             return true;
         }
 
         return false;
+    }
+}
+
+public interface IStorage
+{
+    Type ComponentType { get; }
+    void DeleteEntity(Entity entity);
+    void AddEntity(Entity entity, object data);
+}
+
+public interface IStorage<in T> : IStorage
+{
+    Type IStorage.ComponentType => typeof(T);
+    void AddEntity(Entity entity, T data);
+    void IStorage.AddEntity(Entity entity, object data)
+    {
+        AddEntity(entity, (T)data);
     }
 }
 

@@ -10,7 +10,7 @@ public class App
     public App(string title, int width, int height)
     {
         Raylib.SetConfigFlags(ConfigFlags.MaximizedWindow | ConfigFlags.VSyncHint | ConfigFlags.AlwaysRunWindow |
-                              ConfigFlags.ResizableWindow);
+                              ConfigFlags.ResizableWindow | ConfigFlags.Msaa4xHint);
         Raylib.InitWindow(width, height, title);
         Raylib.InitAudioDevice();
     }

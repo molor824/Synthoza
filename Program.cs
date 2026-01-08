@@ -1,6 +1,4 @@
-﻿using Raylib_cs;
-
-namespace Synthoza;
+﻿namespace Synthoza;
 
 internal static class Program
 {
@@ -9,17 +7,17 @@ internal static class Program
         var app = new App("Synthoza", 1280, 720);
 
         var entityStorage = new EntityStorage();
-        var hierarchyStorage = new HierarchyStorage(entityStorage);
-        var transformStorage = new TransformStorage(entityStorage, hierarchyStorage);
+        var hierarchyStorage = new HierarchyStorage();
+        var transformStorage = new TransformStorage(hierarchyStorage);
+        var rectangleRenderer = new RectangleRenderer(transformStorage);
 
-        var instrumentTest = new InstrumentTest();
-
+        entityStorage.AddStorages(hierarchyStorage, transformStorage, rectangleRenderer);
+        
+        var transformTest = new TransformTest(entityStorage, transformStorage);
         var renderPass = new RenderPass();
-        var pianoRoll = new PianoRoll();
-
-        renderPass.AddHandles(pianoRoll);
-        app.AddHandles(instrumentTest, pianoRoll, renderPass);
-        app.AddDisposables(instrumentTest);
+        
+        renderPass.AddHandles(rectangleRenderer);
+        app.AddHandles(transformTest, renderPass);
 
         app.Run();
     }
