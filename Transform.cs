@@ -2,28 +2,10 @@ using System.Numerics;
 
 namespace Synthoza;
 
-public record struct Transform
+public record struct Transform(Vector2 Translation, Complex Basis)
 {
-    /// <summary>
-    /// Translation of transform
-    /// </summary>
-    public Vector2 Translation;
-
-    /// <summary>
-    /// Rotation and uniform scaling of transform.
-    /// The direction of the complex number in polar coordinates indicate the rotation,
-    /// while the magnitude indicate uniform scaling. 
-    /// </summary>
-    public Complex Basis;
-
     public float Scale => (float)Basis.Magnitude;
     public float Rotation => (float)Basis.Phase;
-
-    public Transform(Vector2 translation, Complex basis)
-    {
-        Translation = translation;
-        Basis = basis;
-    }
 
     public Transform Inverse()
     {
