@@ -6,6 +6,9 @@ public class TransformStorage : IStorage<Transform>
     private Dictionary<Entity, Transform> _transforms = [];
 
     // Cache (Lazy)
+    // NOTE: If a global transform exists, then there must be ATLEAST ONE global transform cached in the children!!!
+    // Because if a global transform does not exist, then the system will assume every descendant also have no global transform!!!
+    // This is to optimize and save time on frequency local transform updates, while balancing frequent global transform reads
     private Dictionary<Entity, Transform> _globalTransforms = [];
 
     private HierarchyStorage _hierarchyStorage;
@@ -44,15 +47,18 @@ public class TransformStorage : IStorage<Transform>
     }
     
     // Delete global transforms propagating down the tree
+    // WARNING: If global transform dont exist at root, then every descendant is ignored!!!
     void DeleteGlobalTransforms(Entity root)
     {
-        _globalTransforms.Remove(root);
-        foreach (var child in _hierarchyStorage.GetDescendants(root))
-            _globalTransforms.Remove(child);
+        if (!_globalTransforms.Remove(root))
+            return;
+        foreach (var child in _hierarchyStorage.GetChildren(root))
+            DeleteGlobalTransforms(child);
     }
 
     // Calculate and store every global transforms from entity up to the parent with global transform
     // WARNING: Assumes entity has local transform!
+    // WARNING: It must cache every global transform of the parents!!!
     Transform CalculateGlobalTransforms(Entity entity)
     {
         // Check if entity has cached global transform, if so return immediately
