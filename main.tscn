@@ -1,10 +1,7 @@
 [gd_scene format=3 uid="uid://cryvjoac6gvu5"]
 
-[ext_resource type="Script" uid="uid://dha454jb0nkns" path="res://list.gd" id="1_ig7tw"]
-[ext_resource type="PackedScene" uid="uid://0l5kuj7mho1o" path="res://element.tscn" id="2_0xm2m"]
-[ext_resource type="PackedScene" uid="uid://d2i456i86ialf" path="res://new_element_popup.tscn" id="3_h2yge"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7dm0k"]
+[ext_resource type="Script" uid="uid://b4ddtjjobs5dg" path="res://scripts/piano_roll/piano.gd" id="1_0xm2m"]
+[ext_resource type="Script" uid="uid://dx662s1i3ehgk" path="res://scripts/piano_roll/piano_roll.gd" id="1_h2yge"]
 
 [node name="Main" type="Control" unique_id=1774947540]
 layout_mode = 3
@@ -14,62 +11,44 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="PanelContainer" type="PanelContainer" parent="." unique_id=1769740484 node_paths=PackedStringArray("element_container", "new_element_button")]
-layout_mode = 0
-offset_right = 500.0
-offset_bottom = 500.0
-script = ExtResource("1_ig7tw")
-element_container = NodePath("VBoxContainer/MarginContainer2/PanelContainer/ScrollContainer/VBoxContainer")
-new_element_button = NodePath("VBoxContainer/MarginContainer/Button")
+[node name="PianoRoll" type="Control" parent="." unique_id=1029458904 node_paths=PackedStringArray("_piano")]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_h2yge")
+_piano = NodePath("HSplitContainer/Piano")
+metadata/_custom_type_script = "uid://dx662s1i3ehgk"
 
-[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer" unique_id=1433499623]
+[node name="HSplitContainer" type="HSplitContainer" parent="PianoRoll" unique_id=1584368085]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+focus_behavior_recursive = 1
+split_offsets = PackedInt32Array(256)
+split_offset = 256
+
+[node name="Piano" type="Control" parent="PianoRoll/HSplitContainer" unique_id=1019112106]
+clip_contents = true
+custom_minimum_size = Vector2(128, 0)
 layout_mode = 2
+script = ExtResource("1_0xm2m")
 
-[node name="MarginContainer" type="MarginContainer" parent="PanelContainer/VBoxContainer" unique_id=1921160691]
-layout_mode = 2
-theme_override_constants/margin_left = 4
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 4
-theme_override_constants/margin_bottom = 4
+[node name="OctaveScroll" type="VBoxContainer" parent="PianoRoll/HSplitContainer/Piano" unique_id=1582407202]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+grow_horizontal = 2
+theme_override_constants/separation = 0
 
-[node name="Label" type="Label" parent="PanelContainer/VBoxContainer/MarginContainer" unique_id=1459774166]
-custom_minimum_size = Vector2(40, 0)
-layout_mode = 2
-size_flags_horizontal = 2
-text = "List"
-
-[node name="Button" type="Button" parent="PanelContainer/VBoxContainer/MarginContainer" unique_id=652697964]
-custom_minimum_size = Vector2(30, 0)
-layout_mode = 2
-size_flags_horizontal = 8
-size_flags_vertical = 4
-text = "+"
-
-[node name="MarginContainer2" type="MarginContainer" parent="PanelContainer/VBoxContainer" unique_id=1892903345]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/margin_left = 4
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 4
-theme_override_constants/margin_bottom = 4
-
-[node name="PanelContainer" type="PanelContainer" parent="PanelContainer/VBoxContainer/MarginContainer2" unique_id=1975791551]
+[node name="Roll" type="Panel" parent="PianoRoll/HSplitContainer" unique_id=1228251181]
 clip_contents = true
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_7dm0k")
-
-[node name="ScrollContainer" type="ScrollContainer" parent="PanelContainer/VBoxContainer/MarginContainer2/PanelContainer" unique_id=149878285]
-layout_mode = 2
-
-[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer/VBoxContainer/MarginContainer2/PanelContainer/ScrollContainer" unique_id=925169723]
-layout_mode = 2
 size_flags_horizontal = 3
-
-[node name="Element" parent="PanelContainer/VBoxContainer/MarginContainer2/PanelContainer/ScrollContainer/VBoxContainer" unique_id=1558323524 instance=ExtResource("2_0xm2m")]
-layout_mode = 2
-
-[node name="Element2" parent="PanelContainer/VBoxContainer/MarginContainer2/PanelContainer/ScrollContainer/VBoxContainer" unique_id=1296912464 instance=ExtResource("2_0xm2m")]
-layout_mode = 2
-
-[node name="NewElementPopup" parent="PanelContainer" unique_id=798387725 instance=ExtResource("3_h2yge")]
-visible = false
+mouse_filter = 1
