@@ -19,5 +19,4 @@ func _gui_input(event: InputEvent) -> void:
 		_dragging = false
 	var mouse_motion_event := event as InputEventMouseMotion
 	if _dragging and mouse_motion_event != null:
-		print(mouse_motion_event.relative)
 		_drag(mouse_motion_event.relative)
