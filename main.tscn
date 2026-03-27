@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://b4ddtjjobs5dg" path="res://scripts/piano_roll/piano.gd" id="1_0xm2m"]
 [ext_resource type="Script" uid="uid://dx662s1i3ehgk" path="res://scripts/piano_roll/piano_roll.gd" id="1_h2yge"]
+[ext_resource type="Script" uid="uid://c04ky6upsu1dr" path="res://scripts/piano_roll/note_grid.gd" id="3_h2yge"]
 
 [node name="Main" type="Control" unique_id=1774947540]
 layout_mode = 3
@@ -11,7 +12,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="PianoRoll" type="Control" parent="." unique_id=1029458904 node_paths=PackedStringArray("_piano")]
+[node name="PianoRoll" type="Control" parent="." unique_id=1029458904]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -19,7 +20,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_h2yge")
-_piano = NodePath("HSplitContainer/Piano")
 metadata/_custom_type_script = "uid://dx662s1i3ehgk"
 
 [node name="HSplitContainer" type="HSplitContainer" parent="PianoRoll" unique_id=1584368085]
@@ -38,6 +38,7 @@ split_offset = 256
 clip_contents = true
 custom_minimum_size = Vector2(128, 0)
 layout_mode = 2
+mouse_filter = 1
 script = ExtResource("1_0xm2m")
 
 [node name="OctaveScroll" type="VBoxContainer" parent="PianoRoll/HSplitContainer/Piano" unique_id=1582407202]
@@ -52,3 +53,13 @@ clip_contents = true
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 1
+
+[node name="NoteGrid" type="Control" parent="PianoRoll/HSplitContainer/Roll" unique_id=1851472288]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("3_h2yge")
