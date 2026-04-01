@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://ddb7f4s83whn6"]
+
+[ext_resource type="StyleBox" uid="uid://3o8yk0ystfue" path="res://styles/piano_roll/note_grid.tres" id="1_ej6ag"]
+
+[node name="VerticalGrid" type="Control" unique_id=92819412]
+layout_mode = 3
+anchors_preset = 9
+anchor_bottom = 1.0
+grow_vertical = 2
+
+[node name="Panel" type="Panel" parent="." unique_id=725047471]
+layout_mode = 1
+anchors_preset = 13
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -1.0
+offset_right = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("1_ej6ag")

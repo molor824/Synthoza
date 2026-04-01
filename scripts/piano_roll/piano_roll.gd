@@ -1,17 +1,29 @@
 class_name PianoRoll extends Control
 
+@export var _note_size := Vector2(100, 32)
+
 var _mouse_entered := false
 var _dragging := false
-var _y_offset := 0.0
+var _offset := Vector2.ZERO
 
-var y_offset: float:
-	get(): return _y_offset
+var offset: Vector2:
+	get(): return _offset
 	set(value):
-		if value == _y_offset: return
-		_y_offset = value
-		y_offset_changed.emit()
+		value = value.max(Vector2.ZERO)
+		if value == _offset: return
+		_offset = value
+		offset_changed.emit()
 
-signal y_offset_changed()
+var note_size: Vector2:
+	get(): return _note_size
+	set(value):
+		value = value.max(Vector2.ZERO)
+		if value == _note_size: return
+		_note_size = value
+		note_size_changed.emit()
+
+signal note_size_changed()
+signal offset_changed()
 
 func _ready() -> void:
 	mouse_entered.connect(func() -> void: _mouse_entered = true)
@@ -24,4 +36,4 @@ func _gui_input(event: InputEvent) -> void:
 		_dragging = false
 	var mouse_motion_event := event as InputEventMouseMotion
 	if _dragging and mouse_motion_event != null:
-		y_offset -= mouse_motion_event.relative.y
+		offset.y -= mouse_motion_event.relative.y
