@@ -1,6 +1,8 @@
 class_name PianoRoll extends Control
 
 @export var _note_size := Vector2(100, 32)
+@export var _bars := 4
+@export var _note_type := 4
 
 var _mouse_entered := false
 var _dragging := false
@@ -22,8 +24,25 @@ var note_size: Vector2:
 		_note_size = value
 		note_size_changed.emit()
 
+var bars: int:
+	get(): return _bars
+	set(value):
+		value = maxi(value, 1)
+		if value == _bars: return
+		_bars = value
+		time_signature_changed.emit()
+
+var note_type: int:
+	get(): return _note_type
+	set(value):
+		value = maxi(value, 1)
+		if value == _note_type: return
+		_note_type = value
+		time_signature_changed.emit()
+
 signal note_size_changed()
 signal offset_changed()
+signal time_signature_changed()
 
 func _ready() -> void:
 	mouse_entered.connect(func() -> void: _mouse_entered = true)

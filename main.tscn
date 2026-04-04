@@ -63,3 +63,21 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
 script = ExtResource("3_h2yge")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PianoRoll/HSplitContainer/Roll/NoteGrid" unique_id=575627172]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="PianoRoll/HSplitContainer/Roll/NoteGrid" unique_id=271842216]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 0
