@@ -20,8 +20,8 @@ func _process(_delta: float) -> void:
 		var offset := _piano_roll.offset
 		var note_size := _piano_roll.note_size
 		var start := -Vector2(fposmod(offset.x, note_size.x), fposmod(offset.y, note_size.y))
-		var index := Vector2i((offset / note_size).floor())
-		var count := Vector2i((size / note_size).ceil())
+		var index := Vector2i(offset / note_size)
+		var count := Vector2i((size / note_size).ceil()) + Vector2i.ONE
 
 		_vertical_container.position.x = start.x
 		_horizontal_container.position.y = start.y
