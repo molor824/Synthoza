@@ -3,6 +3,7 @@ class_name PianoRoll extends Control
 @export var _note_size := Vector2(100, 32)
 @export var _bars := 4
 @export var _note_type := 4
+@export var _ruler_size := 32
 
 var _mouse_entered := false
 var _dragging := false
@@ -39,6 +40,9 @@ var note_type: int:
 		if value == _note_type: return
 		_note_type = value
 		time_signature_changed.emit()
+
+var ruler_size: int:
+	get(): return _ruler_size
 
 signal note_size_changed()
 signal offset_changed()

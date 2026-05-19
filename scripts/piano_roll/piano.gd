@@ -3,8 +3,8 @@ class_name Piano extends Control
 var _octave_scene := preload("res://scenes/piano_roll/octave.tscn")
 var _offset_changed := true
 
-@onready var _octave_scroll: Control = $OctaveScroll
-@onready var _piano: PianoRoll = $"../.."
+@export var _octave_scroll: VBoxContainer
+@export var _piano: PianoRoll
 
 func _on_offset_change() -> void:
 	_offset_changed = true
@@ -27,6 +27,7 @@ func _process(_delta: float) -> void:
 		for i in octaves:
 			var octave: Octave = children[i] if i < len(children) else _octave_scene.instantiate()
 			octave.octave = i + start_octave
+			octave.custom_minimum_size.y = octave_height
 			if i >= len(children):
 				_octave_scroll.add_child(octave)
 		for i in range(octaves, len(children)):

@@ -6,12 +6,12 @@ var _update_grid := true
 
 @export var _opacity := 0.5
 @export var _highlight_opacity := 1.0
+@export var _piano_roll: PianoRoll
+@export var _vertical_container: HBoxContainer
+@export var _horizontal_container: VBoxContainer
 
 @onready var _vertical_grid_scene := preload("res://scenes/piano_roll/vertical_grid.tscn")
 @onready var _horizontal_grid_scene := preload("res://scenes/piano_roll/horizontal_grid.tscn")
-@onready var _piano_roll := $"../../.." as PianoRoll
-@onready var _vertical_container := $HBoxContainer as Control
-@onready var _horizontal_container := $VBoxContainer as Control
 
 func _process(_delta: float) -> void:
 	if _update_grid:
