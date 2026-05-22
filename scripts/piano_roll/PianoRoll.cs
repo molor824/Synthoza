@@ -10,9 +10,9 @@ public partial class PianoRoll : Control
     private bool _mouseEntered, _dragging;
     private Vector2 _offset;
 
-    [Signal] public delegate void NoteSizeChangedEventHandler();
-    [Signal] public delegate void OffsetChangedEventHandler();
-    [Signal] public delegate void TimeSignatureChangedEventHandler();
+    public event Action NoteSizeChanged;
+    public event Action OffsetChanged;
+    public event Action TimeSignatureChanged;
 
     public Vector2 Offset
     {
@@ -22,7 +22,7 @@ public partial class PianoRoll : Control
             value = value.Max(Vector2.Zero);
             if (value == _offset) return;
             _offset = value;
-            EmitSignal(SignalName.OffsetChanged);
+            OffsetChanged?.Invoke();
         }
     }
     public Vector2 NoteSize
@@ -33,7 +33,7 @@ public partial class PianoRoll : Control
             value = value.Max(Vector2.Zero);
             if (value == _noteSize) return;
             _noteSize = value;
-            EmitSignal(SignalName.NoteSizeChanged);
+            NoteSizeChanged?.Invoke();
         }
     }
     public int Bars
@@ -44,7 +44,7 @@ public partial class PianoRoll : Control
             value = Math.Max(value, 1);
             if (value == _bars) return;
             _bars = value;
-            EmitSignal(SignalName.TimeSignatureChanged);
+            TimeSignatureChanged?.Invoke();
         }
     }
     public int Crotchets
@@ -55,7 +55,7 @@ public partial class PianoRoll : Control
             value = Math.Max(value, 1);
             if (value == _crotchets) return;
             _crotchets = value;
-            EmitSignal(SignalName.TimeSignatureChanged);
+            TimeSignatureChanged?.Invoke();
         }
     }
 
