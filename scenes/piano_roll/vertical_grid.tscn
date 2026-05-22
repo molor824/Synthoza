@@ -1,13 +1,19 @@
 [gd_scene format=3 uid="uid://ddb7f4s83whn6"]
 
+[ext_resource type="Script" uid="uid://ce4yy2bkp1r06" path="res://scripts/piano_roll/VerticalGrid.cs" id="1_1fsl3"]
 [ext_resource type="StyleBox" uid="uid://3o8yk0ystfue" path="res://styles/piano_roll/note_grid.tres" id="1_ej6ag"]
 
-[node name="VerticalGrid" type="Control" unique_id=92819412]
+[sub_resource type="LabelSettings" id="LabelSettings_ej6ag"]
+font_size = 12
+
+[node name="VerticalGrid" type="Control" unique_id=92819412 node_paths=PackedStringArray("_label")]
 layout_mode = 3
 anchors_preset = 9
 anchor_bottom = 1.0
 grow_vertical = 2
 mouse_filter = 1
+script = ExtResource("1_1fsl3")
+_label = NodePath("Label")
 
 [node name="Panel" type="Panel" parent="." unique_id=725047471]
 layout_mode = 1
@@ -17,3 +23,11 @@ offset_right = 1.0
 grow_vertical = 2
 mouse_filter = 1
 theme_override_styles/panel = ExtResource("1_ej6ag")
+
+[node name="Label" type="Label" parent="." unique_id=1658192210]
+layout_mode = 0
+offset_left = 4.0
+offset_right = 40.0
+offset_bottom = 23.0
+text = "0"
+label_settings = SubResource("LabelSettings_ej6ag")

@@ -53,7 +53,7 @@ public partial class NoteGrid : Control
             
         for (var i = 0; i < count.X; i++)
         {
-            var grid = (Control)(i < verticalChildren.Count ? verticalChildren[i] : _verticalGridScene.Instantiate());
+            var grid = (VerticalGrid)(i < verticalChildren.Count ? verticalChildren[i] : _verticalGridScene.Instantiate());
             if (i >= verticalChildren.Count) _verticalContainer.AddChild(grid);
 
             grid.CustomMinimumSize = grid.CustomMinimumSize with
@@ -61,10 +61,14 @@ public partial class NoteGrid : Control
                 X = noteSize.X
             };
 
+            var bar = index.X + i;
+
             grid.Modulate = grid.Modulate with
             {
-                A = (index.X + i) % _pianoRoll.Bars != 0 ? _opacity : _highlightOpacity
+                A = bar % _pianoRoll.Bars != 0 ? _opacity : _highlightOpacity
             };
+            
+            grid.Measure = bar % _pianoRoll.Bars == 0 ? bar / _pianoRoll.Bars : null;
         }
         for (var i = 0; i < count.Y; i++)
         {
