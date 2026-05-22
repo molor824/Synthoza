@@ -40,44 +40,47 @@ public partial class NoteGrid : Control
             var index = (Vector2I)(offset / noteSize);
             var count = (Vector2I)(Size / noteSize).Ceil() + Vector2I.One;
 
-            var position = _verticalContainer.Position;
-            position.X = start.X;
-            _verticalContainer.Position = position;
-
-            position = _horizontalContainer.Position;
-            position.Y = start.Y;
-            _horizontalContainer.Position = position;
+            _verticalContainer.Position = _verticalContainer.Position with
+            {
+                X = start.X
+            };
+            _horizontalContainer.Position = _horizontalContainer.Position with
+            {
+                Y = start.Y
+            };
 
             var verticalChildren = _verticalContainer.GetChildren();
-
+            var horizontalChildren = _horizontalContainer.GetChildren();
+            
             for (var i = 0; i < count.X; i++)
             {
                 var grid = (Control)(i < verticalChildren.Count ? verticalChildren[i] : _verticalGridScene.Instantiate());
                 if (i >= verticalChildren.Count) _verticalContainer.AddChild(grid);
 
-                var minSize = grid.CustomMinimumSize;
-                minSize.X = noteSize.X;
-                grid.CustomMinimumSize = minSize;
+                grid.CustomMinimumSize = grid.CustomMinimumSize with
+                {
+                    X = noteSize.X
+                };
 
-                var modulate = grid.Modulate;
-                modulate.A = (index.X + i) % _pianoRoll.Bars != 0 ? _opacity : _highlightOpacity;
-                grid.Modulate = modulate;
+                grid.Modulate = grid.Modulate with
+                {
+                    A = (index.X + i) % _pianoRoll.Bars != 0 ? _opacity : _highlightOpacity
+                };
             }
-
-            var horizontalChildren = _horizontalContainer.GetChildren();
-
             for (var i = 0; i < count.Y; i++)
             {
                 var grid = (Control)(i < horizontalChildren.Count ? horizontalChildren[i] : _horizontalGridScene.Instantiate());
                 if (i >= horizontalChildren.Count) _horizontalContainer.AddChild(grid);
 
-                var minSize = grid.CustomMinimumSize;
-                minSize.Y = noteSize.Y;
-                grid.CustomMinimumSize = minSize;
+                grid.CustomMinimumSize = grid.CustomMinimumSize with
+                {
+                    Y = noteSize.Y
+                };
 
-                var modulate = grid.Modulate;
-                modulate.A = _opacity;
-                grid.Modulate = modulate;
+                grid.Modulate = grid.Modulate with
+                {
+                    A = _opacity
+                };
             }
 
             for (var i = count.X; i < verticalChildren.Count; i++) verticalChildren[i].QueueFree();

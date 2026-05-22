@@ -30,10 +30,10 @@ public partial class Piano : Control
 			var octaveHeight = _pianoRoll.NoteSize.Y * 12;
 			var offset = _pianoRoll.Offset.Y;
 
-			_octaveScroll.Position = new Vector2(
-				_octaveScroll.Position.X,
-				-Mathf.PosMod(offset, octaveHeight)
-			);
+			_octaveScroll.Position = _octaveScroll.Position with
+			{
+				Y = -Mathf.PosMod(offset, octaveHeight)
+			};
 
 			var startOctave = Mathf.FloorToInt(offset / octaveHeight);
 			var endOctave = Mathf.CeilToInt((offset + Size.Y) / octaveHeight);
@@ -43,10 +43,10 @@ public partial class Piano : Control
 			{
 				var octave = i < children.Count ? (Octave)children[i] : _octaveScene.Instantiate<Octave>();
 				octave.Index = i + startOctave;
-				octave.CustomMinimumSize = new Vector2(
-					octave.CustomMinimumSize.X,
-					octaveHeight
-				);
+				octave.CustomMinimumSize = octave.CustomMinimumSize with
+				{
+					Y = octaveHeight
+				};
 				if (i >= children.Count) _octaveScroll.AddChild(octave);
 			}
 
