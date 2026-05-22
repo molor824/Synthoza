@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://clt6l5ommreyr"]
 
-[ext_resource type="Script" uid="uid://cyldgjuy64q7o" path="res://scripts/piano_roll/octave.gd" id="1_6v17q"]
+[ext_resource type="Script" uid="uid://d0nq5qcd7o1km" path="res://scripts/piano_roll/Octave.cs" id="1_6v17q"]
 [ext_resource type="StyleBox" uid="uid://3tat7rm1s4c2" path="res://styles/piano_roll/white_key_normal.tres" id="2_8qmku"]
 [ext_resource type="StyleBox" uid="uid://bhv26kgwtvcbt" path="res://styles/piano_roll/white_key_pressed.tres" id="3_gr5sn"]
 [ext_resource type="StyleBox" uid="uid://iqdn2m74xteu" path="res://styles/piano_roll/white_key_hover.tres" id="4_ywtuq"]
@@ -12,7 +12,7 @@
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_kek77"]
 
-[node name="Octave" type="Control" unique_id=645969591 node_paths=PackedStringArray("octave_label")]
+[node name="Octave" type="Control" unique_id=645969591 node_paths=PackedStringArray("_label")]
 custom_minimum_size = Vector2(128, 384)
 layout_mode = 3
 anchors_preset = 4
@@ -25,7 +25,7 @@ grow_vertical = 2
 focus_behavior_recursive = 1
 mouse_filter = 1
 script = ExtResource("1_6v17q")
-octave_label = NodePath("Label")
+_label = NodePath("Label")
 
 [node name="WhiteKey" type="Button" parent="." unique_id=93999674]
 layout_mode = 1
