@@ -2,8 +2,10 @@
 
 [ext_resource type="Script" uid="uid://dx662s1i3ehgk" path="res://scripts/piano_roll/piano_roll.gd" id="1_73ve1"]
 [ext_resource type="Script" uid="uid://b4ddtjjobs5dg" path="res://scripts/piano_roll/piano.gd" id="2_dx10r"]
-[ext_resource type="StyleBox" uid="uid://di6aesgt4u0dy" path="res://styles/piano_roll/ruler_background.tres" id="3_crors"]
 [ext_resource type="Script" uid="uid://c04ky6upsu1dr" path="res://scripts/piano_roll/note_grid.gd" id="4_qch7j"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_73ve1"]
+bg_color = Color(0.16924527, 0.16924533, 0.16924518, 1)
 
 [node name="PianoRoll" type="Control" unique_id=235370985]
 layout_mode = 3
@@ -13,31 +15,20 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_73ve1")
+_note_size = Vector2(96, 24)
 metadata/_custom_type_script = "uid://dx662s1i3ehgk"
 
-[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=840627675]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/separation = 0
-
-[node name="Panel" type="Panel" parent="VBoxContainer" unique_id=224279331]
-custom_minimum_size = Vector2(0, 16)
-layout_mode = 2
-theme_override_styles/panel = ExtResource("3_crors")
-
-[node name="HSplitContainer" type="HSplitContainer" parent="VBoxContainer" unique_id=1405871536]
-layout_mode = 2
+[node name="HSplitContainer" type="HSplitContainer" parent="." unique_id=1405871536]
+layout_mode = 0
+offset_right = 1280.0
+offset_bottom = 720.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 focus_behavior_recursive = 1
 split_offsets = PackedInt32Array(192)
 split_offset = 192
 
-[node name="Piano" type="Control" parent="VBoxContainer/HSplitContainer" unique_id=276767138 node_paths=PackedStringArray("_octave_scroll", "_piano")]
+[node name="Piano" type="Control" parent="HSplitContainer" unique_id=276767138 node_paths=PackedStringArray("_octave_scroll", "_piano")]
 clip_contents = true
 custom_minimum_size = Vector2(128, 0)
 layout_mode = 2
@@ -45,9 +36,9 @@ size_flags_vertical = 3
 mouse_filter = 1
 script = ExtResource("2_dx10r")
 _octave_scroll = NodePath("OctaveScroll")
-_piano = NodePath("../../..")
+_piano = NodePath("../..")
 
-[node name="OctaveScroll" type="VBoxContainer" parent="VBoxContainer/HSplitContainer/Piano" unique_id=1662696469]
+[node name="OctaveScroll" type="VBoxContainer" parent="HSplitContainer/Piano" unique_id=1662696469]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -56,14 +47,15 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 0
 
-[node name="Roll" type="Panel" parent="VBoxContainer/HSplitContainer" unique_id=336352109]
+[node name="Roll" type="Panel" parent="HSplitContainer" unique_id=336352109]
 clip_contents = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 mouse_filter = 1
+theme_override_styles/panel = SubResource("StyleBoxFlat_73ve1")
 
-[node name="NoteGrid" type="Control" parent="VBoxContainer/HSplitContainer/Roll" unique_id=1001421149 node_paths=PackedStringArray("_piano_roll", "_vertical_container", "_horizontal_container")]
+[node name="NoteGrid" type="Control" parent="HSplitContainer/Roll" unique_id=1001421149 node_paths=PackedStringArray("_piano_roll", "_vertical_container", "_horizontal_container")]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -73,11 +65,11 @@ grow_vertical = 2
 size_flags_vertical = 3
 mouse_filter = 1
 script = ExtResource("4_qch7j")
-_piano_roll = NodePath("../../../..")
+_piano_roll = NodePath("../../..")
 _vertical_container = NodePath("HBoxContainer")
 _horizontal_container = NodePath("VBoxContainer")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/HSplitContainer/Roll/NoteGrid" unique_id=1558012135]
+[node name="VBoxContainer" type="VBoxContainer" parent="HSplitContainer/Roll/NoteGrid" unique_id=1558012135]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -86,7 +78,7 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 0
 
-[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/HSplitContainer/Roll/NoteGrid" unique_id=2030905197]
+[node name="HBoxContainer" type="HBoxContainer" parent="HSplitContainer/Roll/NoteGrid" unique_id=2030905197]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0

@@ -33,6 +33,10 @@ window/stretch/aspect="ignore"
 
 project/assembly_name="synthoza"
 
+[gui]
+
+theme/custom="uid://cl8sb2gflfx3s"
+
 [input]
 
 editor_drag={
