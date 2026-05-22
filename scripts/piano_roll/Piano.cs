@@ -23,34 +23,32 @@ public partial class Piano : Control
 	{
 		base._Process(delta);
 
-		if (_changeRequested)
+		if (!_changeRequested) return;
+		_changeRequested = false;
+
+		var octaveHeight = _pianoRoll.NoteSize.Y * 12;
+		var offset = _pianoRoll.Offset.Y;
+
+		_octaveScroll.Position = _octaveScroll.Position with
 		{
-			_changeRequested = false;
+			Y = -Mathf.PosMod(offset, octaveHeight)
+		};
 
-			var octaveHeight = _pianoRoll.NoteSize.Y * 12;
-			var offset = _pianoRoll.Offset.Y;
-
-			_octaveScroll.Position = _octaveScroll.Position with
+		var startOctave = Mathf.FloorToInt(offset / octaveHeight);
+		var endOctave = Mathf.CeilToInt((offset + Size.Y) / octaveHeight);
+		var octaves = endOctave - startOctave;
+		var children = _octaveScroll.GetChildren();
+		for (var i = 0; i < octaves; i++)
+		{
+			var octave = i < children.Count ? (Octave)children[i] : _octaveScene.Instantiate<Octave>();
+			octave.Index = i + startOctave;
+			octave.CustomMinimumSize = octave.CustomMinimumSize with
 			{
-				Y = -Mathf.PosMod(offset, octaveHeight)
+				Y = octaveHeight
 			};
-
-			var startOctave = Mathf.FloorToInt(offset / octaveHeight);
-			var endOctave = Mathf.CeilToInt((offset + Size.Y) / octaveHeight);
-			var octaves = endOctave - startOctave;
-			var children = _octaveScroll.GetChildren();
-			for (var i = 0; i < octaves; i++)
-			{
-				var octave = i < children.Count ? (Octave)children[i] : _octaveScene.Instantiate<Octave>();
-				octave.Index = i + startOctave;
-				octave.CustomMinimumSize = octave.CustomMinimumSize with
-				{
-					Y = octaveHeight
-				};
-				if (i >= children.Count) _octaveScroll.AddChild(octave);
-			}
-
-			for (var i = octaves; i < children.Count; i++) children[i].QueueFree();
+			if (i >= children.Count) _octaveScroll.AddChild(octave);
 		}
+
+		for (var i = octaves; i < children.Count; i++) children[i].QueueFree();
 	}
 }

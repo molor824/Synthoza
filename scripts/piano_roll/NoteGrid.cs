@@ -30,62 +30,60 @@ public partial class NoteGrid : Control
     {
         base._Process(delta);
 
-        if (_changeRequested)
+        if (!_changeRequested) return;
+        _changeRequested = false;
+
+        var offset = _pianoRoll.Offset;
+        var noteSize = _pianoRoll.NoteSize;
+        var start = -offset.PosMod(noteSize);
+        var index = (Vector2I)(offset / noteSize);
+        var count = (Vector2I)(Size / noteSize).Ceil() + Vector2I.One;
+
+        _verticalContainer.Position = _verticalContainer.Position with
         {
-            _changeRequested = false;
+            X = start.X
+        };
+        _horizontalContainer.Position = _horizontalContainer.Position with
+        {
+            Y = start.Y
+        };
 
-            var offset = _pianoRoll.Offset;
-            var noteSize = _pianoRoll.NoteSize;
-            var start = -offset.PosMod(noteSize);
-            var index = (Vector2I)(offset / noteSize);
-            var count = (Vector2I)(Size / noteSize).Ceil() + Vector2I.One;
-
-            _verticalContainer.Position = _verticalContainer.Position with
-            {
-                X = start.X
-            };
-            _horizontalContainer.Position = _horizontalContainer.Position with
-            {
-                Y = start.Y
-            };
-
-            var verticalChildren = _verticalContainer.GetChildren();
-            var horizontalChildren = _horizontalContainer.GetChildren();
+        var verticalChildren = _verticalContainer.GetChildren();
+        var horizontalChildren = _horizontalContainer.GetChildren();
             
-            for (var i = 0; i < count.X; i++)
+        for (var i = 0; i < count.X; i++)
+        {
+            var grid = (Control)(i < verticalChildren.Count ? verticalChildren[i] : _verticalGridScene.Instantiate());
+            if (i >= verticalChildren.Count) _verticalContainer.AddChild(grid);
+
+            grid.CustomMinimumSize = grid.CustomMinimumSize with
             {
-                var grid = (Control)(i < verticalChildren.Count ? verticalChildren[i] : _verticalGridScene.Instantiate());
-                if (i >= verticalChildren.Count) _verticalContainer.AddChild(grid);
+                X = noteSize.X
+            };
 
-                grid.CustomMinimumSize = grid.CustomMinimumSize with
-                {
-                    X = noteSize.X
-                };
-
-                grid.Modulate = grid.Modulate with
-                {
-                    A = (index.X + i) % _pianoRoll.Bars != 0 ? _opacity : _highlightOpacity
-                };
-            }
-            for (var i = 0; i < count.Y; i++)
+            grid.Modulate = grid.Modulate with
             {
-                var grid = (Control)(i < horizontalChildren.Count ? horizontalChildren[i] : _horizontalGridScene.Instantiate());
-                if (i >= horizontalChildren.Count) _horizontalContainer.AddChild(grid);
-
-                grid.CustomMinimumSize = grid.CustomMinimumSize with
-                {
-                    Y = noteSize.Y
-                };
-
-                grid.Modulate = grid.Modulate with
-                {
-                    A = _opacity
-                };
-            }
-
-            for (var i = count.X; i < verticalChildren.Count; i++) verticalChildren[i].QueueFree();
-            for (var i = count.Y; i < horizontalChildren.Count; i++) horizontalChildren[i].QueueFree();
+                A = (index.X + i) % _pianoRoll.Bars != 0 ? _opacity : _highlightOpacity
+            };
         }
+        for (var i = 0; i < count.Y; i++)
+        {
+            var grid = (Control)(i < horizontalChildren.Count ? horizontalChildren[i] : _horizontalGridScene.Instantiate());
+            if (i >= horizontalChildren.Count) _horizontalContainer.AddChild(grid);
+
+            grid.CustomMinimumSize = grid.CustomMinimumSize with
+            {
+                Y = noteSize.Y
+            };
+
+            grid.Modulate = grid.Modulate with
+            {
+                A = _opacity
+            };
+        }
+
+        for (var i = count.X; i < verticalChildren.Count; i++) verticalChildren[i].QueueFree();
+        for (var i = count.Y; i < horizontalChildren.Count; i++) horizontalChildren[i].QueueFree();
     }
 
     public override void _GuiInput(InputEvent @event)
