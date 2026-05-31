@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://clt6l5ommreyr"]
 
-[ext_resource type="Script" uid="uid://d0nq5qcd7o1km" path="res://scripts/piano_roll/Octave.cs" id="1_6v17q"]
+[ext_resource type="Script" uid="uid://bqjfexkd75bg" path="res://scripts/piano_roll/octave.gd" id="1_6v17q"]
 [ext_resource type="StyleBox" uid="uid://3tat7rm1s4c2" path="res://styles/piano_roll/white_key_normal.tres" id="2_8qmku"]
 [ext_resource type="StyleBox" uid="uid://bhv26kgwtvcbt" path="res://styles/piano_roll/white_key_pressed.tres" id="3_gr5sn"]
 [ext_resource type="StyleBox" uid="uid://iqdn2m74xteu" path="res://styles/piano_roll/white_key_hover.tres" id="4_ywtuq"]

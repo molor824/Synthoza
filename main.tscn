@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://cryvjoac6gvu5"]
 
 [ext_resource type="PackedScene" uid="uid://ctd64lyreo2th" path="res://scenes/piano_roll/piano_roll.tscn" id="1_ig7tw"]
+[ext_resource type="Script" uid="uid://c4uh7lpq1mtey" path="res://scripts/piano_roll/piano_roll.gd" id="2_0xm2m"]
 
 [node name="Main" type="Control" unique_id=1774947540]
 layout_mode = 3
@@ -12,3 +13,5 @@ grow_vertical = 2
 
 [node name="PianoRoll" parent="." unique_id=235370985 instance=ExtResource("1_ig7tw")]
 layout_mode = 1
+script = ExtResource("2_0xm2m")
+_note_size = Vector2(96, 24)

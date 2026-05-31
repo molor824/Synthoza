@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://ddb7f4s83whn6"]
 
-[ext_resource type="Script" uid="uid://ce4yy2bkp1r06" path="res://scripts/piano_roll/VerticalGrid.cs" id="1_1fsl3"]
+[ext_resource type="Script" uid="uid://3f6ngaim3kbc" path="res://scripts/piano_roll/vertical_grid.gd" id="1_1fsl3"]
 [ext_resource type="StyleBox" uid="uid://3o8yk0ystfue" path="res://styles/piano_roll/note_grid.tres" id="1_ej6ag"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_ej6ag"]
