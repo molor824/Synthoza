@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use core::{f32, f64};
+    use core::f32;
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
     use mlua::prelude::*;
-    use rtrb::{RingBuffer, chunks::ChunkError};
+    use rtrb::RingBuffer;
     use std::{thread, time::Duration};
 
     #[test]
@@ -44,14 +44,21 @@ mod tests {
 
     #[test]
     fn test_mlua() {
+        const FOURIER_ITER: usize = 3000;
         const WAVE: &str = r#"
         local phase = 0.0
         
-        function process(freq, data, len)
+        function process(freq, buffer, len)
             for i = 1, len, CHANNELS do
-                local audio = math.sin(math.pi * phase) + math.tan(math.pi * phase)
-                data[i] = audio
-                data[i + 1] = audio
+                local audio = 0.0
+                local radian = phase * (math.pi * 2.0)
+
+                for j = 1, FOURIER_ITER do
+                    audio = audio + math.sin(radian * j) / j
+                end
+
+                buffer[i] = audio
+                buffer[i + 1] = audio
             
                 phase = (phase + freq / SAMPLE_RATE) % 1.0
             end
@@ -68,13 +75,13 @@ mod tests {
         let lua = Lua::new();
         let globals = lua.globals();
 
+        globals.set("FOURIER_ITER", FOURIER_ITER).unwrap();
         globals.set("SAMPLE_RATE", sample_rate).unwrap();
         globals.set("CHANNELS", channels).unwrap();
 
         lua.load(WAVE).exec().unwrap();
 
         let lua_process = globals.get::<LuaFunction>("process").unwrap();
-        let lua_data = lua.create_table().unwrap();
 
         let (mut stream_producer, mut stream_consumer) =
             RingBuffer::<f32>::new(channels * sample_rate);
@@ -87,6 +94,7 @@ mod tests {
                         Ok(ch) => ch,
                         Err(err) => {
                             data.fill(0.0);
+                            eprintln!("{err:?}");
                             return;
                         }
                     };
@@ -108,34 +116,42 @@ mod tests {
 
         let duration = 10.0;
         let mut time = 0.0;
-        let dt = 1.0 / sample_rate as f64;
+        let dt = 1.0 / sample_rate as f32;
+        let amplitude = 0.2;
 
-        let mut aux_buffer: Vec<f32> = vec![];
+        let lua_buffer = lua
+            .create_table_with_capacity(sample_rate * channels, 0)
+            .unwrap();
 
         while time <= duration {
             let freq = freq_start + (freq_end - freq_start) * (time / duration);
-            let buffer_size = (1.0 / freq * sample_rate as f64).round() as usize * channels;
+            let buffer_size = (1.0 / freq * sample_rate as f32).round() as usize;
 
-            lua_data.clear().unwrap();
+            for i in 1..=buffer_size {
+                lua_buffer.raw_set(i, 0.0).unwrap();
+            }
             lua_process
-                .call::<()>((freq, &lua_data, buffer_size))
+                .call::<()>((freq, &lua_buffer, buffer_size))
                 .unwrap();
+            let mut buffer: Vec<f32> = Vec::with_capacity(buffer_size);
+            for i in 1..=buffer_size {
+                buffer.push(lua_buffer.raw_get(i).unwrap());
+            }
 
-            aux_buffer.resize(buffer_size, 0.0);
-            for (i, value) in lua_data.sequence_values::<f32>().enumerate() {
-                aux_buffer[i] = value.unwrap().clamp(-1.0, 1.0) * 0.2;
+            for data in &mut buffer {
+                *data *= amplitude;
             }
 
             loop {
-                match stream_producer.push_entire_slice(&aux_buffer) {
+                match stream_producer.push_entire_slice(&buffer) {
                     Ok(_) => break,
                     Err(_) => thread::sleep(Duration::from_millis(1)),
                 }
             }
 
-            time += buffer_size as f64 * dt;
+            time += buffer_size as f32 * dt;
         }
 
-        thread::sleep(Duration::from_secs(2));
+        thread::sleep(Duration::from_secs(1));
     }
 }
