@@ -1,2 +1,7 @@
-Cargo.lock
-target/
+# Godot 4+ specific ignores
+.godot/
+/android/
+.idea/
+Synthoza.sln.DotSettings.user
+.vscode/
+.build/

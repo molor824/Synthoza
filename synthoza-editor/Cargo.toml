@@ -1,7 +1,0 @@
-[package]
-name = "synthoza-editor"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-eframe = "0.35.0"
