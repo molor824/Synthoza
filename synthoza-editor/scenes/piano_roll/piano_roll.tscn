@@ -2,15 +2,12 @@
 
 [ext_resource type="Script" uid="uid://c4uh7lpq1mtey" path="res://scripts/piano_roll/piano_roll.gd" id="1_crors"]
 [ext_resource type="Script" uid="uid://b8v5fkans1t00" path="res://scripts/piano_roll/piano.gd" id="2_dx10r"]
-[ext_resource type="PackedScene" uid="uid://clt6l5ommreyr" path="res://scenes/piano_roll/octave.tscn" id="3_crors"]
 [ext_resource type="Script" uid="uid://bmbmluewf2j6f" path="res://scripts/piano_roll/note_grid.gd" id="3_dx10r"]
-[ext_resource type="PackedScene" uid="uid://ddb7f4s83whn6" path="res://scenes/piano_roll/vertical_grid.tscn" id="5_qch7j"]
-[ext_resource type="PackedScene" uid="uid://dkhfiq70ir6k4" path="res://scenes/piano_roll/horizontal_grid.tscn" id="6_r7d8w"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_73ve1"]
 bg_color = Color(0.16924527, 0.16924533, 0.16924518, 1)
 
-[node name="PianoRoll" type="Control" unique_id=235370985]
+[node name="PianoRoll" type="Control" unique_id=56708367]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -18,6 +15,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_crors")
+metadata/_custom_type_script = "uid://c4uh7lpq1mtey"
 
 [node name="HSplitContainer" type="HSplitContainer" parent="." unique_id=1405871536]
 layout_mode = 1
@@ -29,28 +27,15 @@ grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 focus_behavior_recursive = 1
-split_offsets = PackedInt32Array(192)
-split_offset = 192
 
-[node name="Piano" type="Control" parent="HSplitContainer" unique_id=276767138 node_paths=PackedStringArray("_octave_scroll", "_piano_roll")]
-clip_contents = true
-custom_minimum_size = Vector2(128, 0)
+[node name="Piano" type="Control" parent="HSplitContainer" unique_id=259279416 node_paths=PackedStringArray("_piano_roll")]
+custom_minimum_size = Vector2(96, 0)
 layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 1
 script = ExtResource("2_dx10r")
-_octave_scroll = NodePath("OctaveScroll")
 _piano_roll = NodePath("../..")
-_octave_scene = ExtResource("3_crors")
-
-[node name="OctaveScroll" type="VBoxContainer" parent="HSplitContainer/Piano" unique_id=1662696469]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/separation = 0
+metadata/_custom_type_script = "uid://b8v5fkans1t00"
 
 [node name="Roll" type="Panel" parent="HSplitContainer" unique_id=336352109]
 clip_contents = true
@@ -60,7 +45,7 @@ size_flags_vertical = 3
 mouse_filter = 1
 theme_override_styles/panel = SubResource("StyleBoxFlat_73ve1")
 
-[node name="NoteGrid" type="Control" parent="HSplitContainer/Roll" unique_id=1001421149 node_paths=PackedStringArray("_piano_roll", "_vertical_container", "_horizontal_container")]
+[node name="NoteGrid" type="Control" parent="HSplitContainer/Roll" unique_id=1396916900 node_paths=PackedStringArray("_piano_roll")]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -71,25 +56,4 @@ size_flags_vertical = 3
 mouse_filter = 1
 script = ExtResource("3_dx10r")
 _piano_roll = NodePath("../../..")
-_vertical_container = NodePath("VerticalGridContainer")
-_horizontal_container = NodePath("HorizontalGridContainer")
-_vertical_grid_scene = ExtResource("5_qch7j")
-_horizontal_grid_scene = ExtResource("6_r7d8w")
-
-[node name="HorizontalGridContainer" type="VBoxContainer" parent="HSplitContainer/Roll/NoteGrid" unique_id=1558012135]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/separation = 0
-
-[node name="VerticalGridContainer" type="HBoxContainer" parent="HSplitContainer/Roll/NoteGrid" unique_id=2030905197]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/separation = 0
+metadata/_custom_type_script = "uid://bmbmluewf2j6f"

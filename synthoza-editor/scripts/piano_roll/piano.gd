@@ -1,43 +1,63 @@
 class_name Piano extends Control
 
-@export var _octave_scroll: VBoxContainer
+const _OUTLINE_WIDTH := 1.0
+const _BLACK_KEY_RATIO := 0.7
+const _BLACK_KEY_COLOR := Color(0.1, 0.1, 0.1)
+const _WHITE_KEY_COLOR := Color(1, 1, 1)
+const _OUTLINE_COLOR := Color.BLACK
+const _WHITE_KEY_RECTS: Array[Rect2] = [
+	Rect2(0, 0, 1, 1.5),
+	Rect2(0, 1.5, 1, 2),
+	Rect2(0, 3.5, 1, 2),
+	Rect2(0, 5.5, 1, 1.5),
+	Rect2(0, 7, 1, 1.5),
+	Rect2(0, 8.5, 1, 2),
+	Rect2(0, 10.5, 1, 1.5)
+]
+const _BLACK_KEY_RECTS: Array[Rect2] = [
+	Rect2(1 - _BLACK_KEY_RATIO, 1, _BLACK_KEY_RATIO, 1),
+	Rect2(1 - _BLACK_KEY_RATIO, 3, _BLACK_KEY_RATIO, 1),
+	Rect2(1 - _BLACK_KEY_RATIO, 5, _BLACK_KEY_RATIO, 1),
+	Rect2(1 - _BLACK_KEY_RATIO, 8, _BLACK_KEY_RATIO, 1),
+	Rect2(1 - _BLACK_KEY_RATIO, 10, _BLACK_KEY_RATIO, 1)
+]
+
 @export var _piano_roll: PianoRoll
-@export var _octave_scene: PackedScene
-
-var _change_requested := true
-
-func _request_change() -> void:
-	_change_requested = true
 
 func _ready() -> void:
-	resized.connect(_request_change)
-	_piano_roll.offset_changed.connect(_request_change)
-	_piano_roll.note_size_changed.connect(_request_change)
+	resized.connect(queue_redraw)
+	_piano_roll.offset_changed.connect(queue_redraw)
+	_piano_roll.note_size_changed.connect(queue_redraw)
 
-func _process(_delta: float) -> void:
-	if !_change_requested: return
-	_change_requested = false
+func _draw_key(rect: Rect2, color: Color) -> void:
+	draw_rect(rect, _OUTLINE_COLOR, true, -1, true)
+	draw_rect(
+		Rect2(
+			rect.position + Vector2.ONE * _OUTLINE_WIDTH,
+			rect.size - Vector2.ONE * (2 * _OUTLINE_WIDTH)
+		), color, true, -1, true
+	)
 
-	var octave_height := _piano_roll.note_size.y * 12
-	var offset := _piano_roll.offset.y
-
-	_octave_scroll.position.y = -fposmod(offset, octave_height)
+func _draw() -> void:
+	var key_size := Vector2(size.x, _piano_roll.note_size.y)
+	var octave_size := key_size.y * 12
+	var cursor := -fposmod(_piano_roll.offset.y, octave_size)
+	var octave := int(_piano_roll.offset.y / octave_size)
 	
-	var start_octave := floori(offset / octave_height)
-	var end_octave := ceili((offset + size.y) / octave_height)
-	var octaves := end_octave - start_octave
-	var child_count := _octave_scroll.get_child_count()
+	while cursor <= size.y:
+		for rect in _WHITE_KEY_RECTS:
+			_draw_key(Rect2(
+				rect.position * key_size + Vector2.DOWN * (size.y - cursor - octave_size),
+				rect.size * key_size
+			), _WHITE_KEY_COLOR)
+		for rect in _BLACK_KEY_RECTS:
+			_draw_key(Rect2(
+				rect.position * key_size + Vector2.DOWN * (size.y - cursor - octave_size),
+				rect.size * key_size
+			), _BLACK_KEY_COLOR)
+		cursor += octave_size
 
-	for i in octaves:
-		var octave: Octave
-		if i < child_count:
-			octave = _octave_scroll.get_child(i)
-		else:
-			octave = _octave_scene.instantiate()
-			_octave_scroll.add_child(octave)
-		
-		octave.index = i + start_octave
-		octave.custom_minimum_size.y = octave_height
-	
-	for i in range(octaves, child_count):
-		_octave_scroll.get_child(i).queue_free()
+func _gui_input(event: InputEvent) -> void:
+	var mouse_motion := event as InputEventMouseMotion
+	if Input.is_action_pressed(InputActions.editor_drag) && mouse_motion:
+		_piano_roll.offset.y += mouse_motion.relative.y
