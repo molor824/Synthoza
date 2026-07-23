@@ -44,7 +44,7 @@ func _draw() -> void:
 	var key_size := Vector2(size.x, _piano_roll.note_size.y)
 	var octave_size := key_size.y * 12
 	var cursor := -fposmod(_piano_roll.offset.y, octave_size)
-	var octave := int(_piano_roll.offset.y / octave_size)
+	var octave := int(_piano_roll.offset.y / octave_size) + 1
 	var font := get_theme_default_font()
 	
 	while cursor <= size.y:
