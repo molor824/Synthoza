@@ -12,5 +12,3 @@ grow_vertical = 2
 
 [node name="PianoRoll" parent="." unique_id=235370985 instance=ExtResource("1_ig7tw")]
 layout_mode = 1
-_note_value = 8
-_notes = 11

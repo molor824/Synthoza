@@ -17,7 +17,7 @@ grow_vertical = 2
 script = ExtResource("1_crors")
 metadata/_custom_type_script = "uid://c4uh7lpq1mtey"
 
-[node name="HSplitContainer" type="HSplitContainer" parent="." unique_id=1405871536]
+[node name="HSplitContainer" type="HBoxContainer" parent="." unique_id=1509091947]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -27,8 +27,10 @@ grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 focus_behavior_recursive = 1
+theme_override_constants/separation = 0
 
 [node name="Piano" type="Control" parent="HSplitContainer" unique_id=259279416 node_paths=PackedStringArray("_piano_roll")]
+clip_contents = true
 custom_minimum_size = Vector2(96, 0)
 layout_mode = 2
 size_flags_vertical = 3
@@ -38,7 +40,6 @@ _piano_roll = NodePath("../..")
 metadata/_custom_type_script = "uid://b8v5fkans1t00"
 
 [node name="Roll" type="Panel" parent="HSplitContainer" unique_id=336352109]
-clip_contents = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -46,6 +47,7 @@ mouse_filter = 1
 theme_override_styles/panel = SubResource("StyleBoxFlat_73ve1")
 
 [node name="NoteGrid" type="Control" parent="HSplitContainer/Roll" unique_id=1396916900 node_paths=PackedStringArray("_piano_roll")]
+clip_contents = true
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
