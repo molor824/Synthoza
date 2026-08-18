@@ -1,19 +1,20 @@
-use std::sync::LazyLock;
+use std::{iter, sync::LazyLock};
 
-use eframe::egui::{Pos2, Rect, Rgba, Sense, Ui, Vec2};
+use eframe::egui::*;
 
 const WHITE_KEY: Rgba = Rgba::from_rgb(0.9, 0.9, 0.9);
-const WHITE_KEY_HOVER: Rgba = Rgba::from_rgb(0.7, 0.7, 0.7);
+const WHITE_KEY_CLICK: Rgba = Rgba::from_rgb(0.7, 0.7, 0.7);
 
 const BLACK_KEY: Rgba = Rgba::from_rgb(0.1, 0.1, 0.1);
-const BLACK_KEY_HOVER: Rgba = Rgba::from_rgb(0.3, 0.3, 0.3);
+const BLACK_KEY_CLICK: Rgba = Rgba::from_rgb(0.3, 0.3, 0.3);
 
-const KEY_WIDTH: f32 = 20.0;
-const KEY_HEIGHT: f32 = 50.0;
-const BLACK_KEY_HEIGHT: f32 = 30.0;
+const KEY_WIDTH: f32 = 10.0;
+const KEY_HEIGHT: f32 = 60.0;
+const BLACK_KEY_HEIGHT: f32 = 40.0;
 
 const PIANO_SIZE: Vec2 = Vec2::new(KEY_HEIGHT, KEY_WIDTH * 12.0);
-const EXPAND_SIZE: f32 = -1.0;
+const STROKE_WIDTH: f32 = 1.0;
+const STROKE_COLOR: Rgba = Rgba::from_rgb(0.0, 0.0, 0.0);
 
 static WHITE_RECTS: LazyLock<[Rect; 7]> = LazyLock::new(|| {
     let sizes = [1.5, 2.0, 2.0, 1.5, 1.5, 2.0, 1.5].map(|y| Vec2::new(KEY_HEIGHT, KEY_WIDTH * y));
@@ -44,72 +45,74 @@ fn offset_rect(rect: Rect, offset: Vec2) -> Rect {
     }
 }
 
-fn show_piano(ui: &mut Ui) -> Option<usize> {
-    let mut key_hit = None;
-    let (response, painter) = ui.allocate_painter(PIANO_SIZE, Sense::empty());
-    let render_rect = response.rect;
-    let pointer_pos = ui.input(|i| i.pointer.hover_pos());
-    let pointer_down = ui.input(|i| i.pointer.primary_down());
-
-    if pointer_down && let Some(pos) = pointer_pos {
-        for (rect, idx) in BLACK_RECTS
-            .into_iter()
-            .chain(*WHITE_RECTS)
-            .zip(BLACK_INDICES.into_iter().chain(WHITE_INDICES))
-        {
-            let screen_rect = offset_rect(rect, render_rect.min.to_vec2());
-            if screen_rect.contains(pos) {
-                key_hit = Some(idx);
-                break;
-            }
-        }
-    }
-
-    for (rect, idx) in WHITE_RECTS.into_iter().zip(WHITE_INDICES) {
-        painter.rect_filled(
-            offset_rect(rect, render_rect.min.to_vec2()).expand(EXPAND_SIZE),
-            0.0,
-            if key_hit == Some(idx) {
-                WHITE_KEY_HOVER
-            } else {
-                WHITE_KEY
-            },
-        );
-    }
-    for (rect, idx) in BLACK_RECTS.into_iter().zip(BLACK_INDICES) {
-        painter.rect_filled(
-            offset_rect(rect, render_rect.min.to_vec2()).expand(EXPAND_SIZE),
-            0.0,
-            if key_hit == Some(idx) {
-                BLACK_KEY_HOVER
-            } else {
-                BLACK_KEY
-            },
-        );
-    }
-
-    key_hit
-}
-
 pub struct PianoRoll {
-    min_octave: usize,
     max_octave: usize,
+    hit_key: Option<usize>, // starting at C0 - 0, D0 - 1 etc...
 }
 
 impl Default for PianoRoll {
     fn default() -> Self {
         Self {
-            min_octave: 0,
             max_octave: 10,
+            hit_key: None,
         }
     }
 }
 impl PianoRoll {
-    pub fn show(&self, ui: &mut Ui) {
+    pub fn show(&mut self, ui: &mut Ui) {
+        self.hit_key = None;
+
         ui.vertical(|ui| {
-            ui.spacing_mut().item_spacing = Vec2::ZERO;
-            for _ in self.min_octave..=self.max_octave {
-                show_piano(ui);
+            let full_rect = PIANO_SIZE * Vec2::new(1.0, (self.max_octave + 1) as f32);
+            let (response, painter) = ui.allocate_painter(full_rect, Sense::DRAG | Sense::CLICK);
+            let render_rect = response.rect;
+            let clicking = response.is_pointer_button_down_on();
+            let pointer_at = ui.input(|i| i.pointer.latest_pos());
+
+            for octave in 0..=self.max_octave {
+                let start = render_rect.min.to_vec2()
+                    + Vec2::new(0.0, PIANO_SIZE.y * (self.max_octave - octave) as f32);
+
+                if self.hit_key.is_none()
+                    && clicking
+                    && let Some(pointer) = pointer_at
+                {
+                    self.hit_key = BLACK_RECTS
+                        .into_iter()
+                        .zip(BLACK_INDICES)
+                        .chain(WHITE_RECTS.into_iter().zip(WHITE_INDICES))
+                        .find(|(rect, _)| offset_rect(*rect, start).contains(pointer))
+                        .map(|(_, idx)| octave * 12 + idx);
+                }
+
+                for ((rect, idx), (color, click_color)) in WHITE_RECTS
+                    .into_iter()
+                    .zip(WHITE_INDICES)
+                    .zip(iter::repeat((WHITE_KEY, WHITE_KEY_CLICK)))
+                    .chain(
+                        BLACK_RECTS
+                            .into_iter()
+                            .zip(BLACK_INDICES)
+                            .zip(iter::repeat((BLACK_KEY, BLACK_KEY_CLICK))),
+                    )
+                {
+                    let rect = offset_rect(rect, start);
+                    painter.rect_filled(
+                        rect,
+                        0.0,
+                        if Some(octave * 12 + idx) == self.hit_key {
+                            click_color
+                        } else {
+                            color
+                        },
+                    );
+                    painter.rect_stroke(
+                        rect,
+                        0.0,
+                        (STROKE_WIDTH, STROKE_COLOR),
+                        StrokeKind::Inside,
+                    );
+                }
             }
         });
     }
