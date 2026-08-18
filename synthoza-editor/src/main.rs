@@ -15,14 +15,12 @@ fn main() {
 }
 
 struct App {
-    frame_count: u64,
     piano_roll: PianoRoll,
 }
 
 impl App {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self {
-            frame_count: 0,
             piano_roll: PianoRoll::default(),
         }
     }
@@ -30,11 +28,7 @@ impl App {
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         CentralPanel::default().show(ui, |ui| {
-            self.frame_count += 1;
-
-            ui.label(format!("Frame {}", self.frame_count));
-
-            ScrollArea::both()
+            ScrollArea::vertical()
                 .stick_to_bottom(true)
                 .show(ui, |ui| self.piano_roll.show(ui));
         });

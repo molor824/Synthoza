@@ -23,7 +23,7 @@ static WHITE_RECTS: LazyLock<[Rect; 7]> = LazyLock::new(|| {
         let size = sizes[idx];
         let rect = Rect::from_min_size(pos, size);
         pos.y += size.y;
-        rect.expand(EXPAND_SIZE)
+        rect
     })
 });
 static BLACK_RECTS: LazyLock<[Rect; 5]> = LazyLock::new(|| {
@@ -31,19 +31,61 @@ static BLACK_RECTS: LazyLock<[Rect; 5]> = LazyLock::new(|| {
 
     std::array::from_fn(|idx| {
         let pos = positions[idx];
-        Rect::from_min_size(pos, Vec2::new(BLACK_KEY_HEIGHT, KEY_WIDTH)).expand(EXPAND_SIZE)
+        Rect::from_min_size(pos, Vec2::new(BLACK_KEY_HEIGHT, KEY_WIDTH))
     })
 });
+const BLACK_INDICES: [usize; 5] = [10, 8, 6, 3, 1];
+const WHITE_INDICES: [usize; 7] = [11, 9, 7, 5, 4, 2, 0];
+
+fn offset_rect(rect: Rect, offset: Vec2) -> Rect {
+    Rect {
+        min: rect.min + offset,
+        max: rect.max + offset,
+    }
+}
 
 fn show_piano(ui: &mut Ui) -> Option<usize> {
     let mut key_hit = None;
-    let (response, painter) = ui.allocate_painter(PIANO_SIZE, Sense::hover() | Sense::click());
+    let (response, painter) = ui.allocate_painter(PIANO_SIZE, Sense::empty());
+    let render_rect = response.rect;
+    let pointer_pos = ui.input(|i| i.pointer.hover_pos());
+    let pointer_down = ui.input(|i| i.pointer.primary_down());
 
-    for rect in WHITE_RECTS.into_iter() {
-        painter.rect_filled(rect, 0.0, WHITE_KEY);
+    if pointer_down && let Some(pos) = pointer_pos {
+        for (rect, idx) in BLACK_RECTS
+            .into_iter()
+            .chain(*WHITE_RECTS)
+            .zip(BLACK_INDICES.into_iter().chain(WHITE_INDICES))
+        {
+            let screen_rect = offset_rect(rect, render_rect.min.to_vec2());
+            if screen_rect.contains(pos) {
+                key_hit = Some(idx);
+                break;
+            }
+        }
     }
-    for rect in BLACK_RECTS.into_iter() {
-        painter.rect_filled(rect, 0.0, BLACK_KEY);
+
+    for (rect, idx) in WHITE_RECTS.into_iter().zip(WHITE_INDICES) {
+        painter.rect_filled(
+            offset_rect(rect, render_rect.min.to_vec2()).expand(EXPAND_SIZE),
+            0.0,
+            if key_hit == Some(idx) {
+                WHITE_KEY_HOVER
+            } else {
+                WHITE_KEY
+            },
+        );
+    }
+    for (rect, idx) in BLACK_RECTS.into_iter().zip(BLACK_INDICES) {
+        painter.rect_filled(
+            offset_rect(rect, render_rect.min.to_vec2()).expand(EXPAND_SIZE),
+            0.0,
+            if key_hit == Some(idx) {
+                BLACK_KEY_HOVER
+            } else {
+                BLACK_KEY
+            },
+        );
     }
 
     key_hit
@@ -65,6 +107,7 @@ impl Default for PianoRoll {
 impl PianoRoll {
     pub fn show(&self, ui: &mut Ui) {
         ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing = Vec2::ZERO;
             for _ in self.min_octave..=self.max_octave {
                 show_piano(ui);
             }
