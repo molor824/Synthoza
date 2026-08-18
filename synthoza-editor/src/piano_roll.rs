@@ -62,7 +62,7 @@ impl PianoRoll {
     pub fn show(&mut self, ui: &mut Ui) {
         self.hit_key = None;
 
-        ui.vertical(|ui| {
+        ui.horizontal(|ui| {
             let full_rect = PIANO_SIZE * Vec2::new(1.0, (self.max_octave + 1) as f32);
             let (response, painter) = ui.allocate_painter(full_rect, Sense::DRAG | Sense::CLICK);
             let render_rect = response.rect;
