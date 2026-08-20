@@ -63,65 +63,76 @@ impl PianoRoll {
         self.hit_key = None;
 
         ui.horizontal(|ui| {
-            let full_rect = PIANO_SIZE * Vec2::new(1.0, (self.max_octave + 1) as f32);
-            let (response, painter) = ui.allocate_painter(full_rect, Sense::DRAG | Sense::CLICK);
-            let render_rect = response.rect;
-            let clicking = response.is_pointer_button_down_on();
-            let pointer_at = ui.input(|i| i.pointer.latest_pos());
+            self.show_piano(ui);
+            self.show_notes(ui);
+        });
+    }
 
-            for octave in 0..=self.max_octave {
-                let start = render_rect.min.to_vec2()
-                    + Vec2::new(0.0, PIANO_SIZE.y * (self.max_octave - octave) as f32);
+    fn show_notes(&mut self, ui: &mut Ui) {
+        let full_rect = Vec2::new(
+            ui.available_width(),
+            PIANO_SIZE.y * (self.max_octave + 1) as f32,
+        );
+        let (response, painter) = ui.allocate_painter(full_rect, Sense::DRAG | Sense::CLICK);
+        let render_rect = response.rect;
+        let clicking = response.is_pointer_button_down_on();
+        let pointer_at = ui.input(|i| i.pointer.latest_pos());
+    }
 
-                if self.hit_key.is_none()
-                    && clicking
-                    && let Some(pointer) = pointer_at
-                {
-                    self.hit_key = BLACK_RECTS
+    fn show_piano(&mut self, ui: &mut Ui) {
+        let full_rect = PIANO_SIZE * Vec2::new(1.0, (self.max_octave + 1) as f32);
+        let (response, painter) = ui.allocate_painter(full_rect, Sense::DRAG | Sense::CLICK);
+        let render_rect = response.rect;
+        let clicking = response.is_pointer_button_down_on();
+        let pointer_at = ui.input(|i| i.pointer.latest_pos());
+
+        for octave in 0..=self.max_octave {
+            let start = render_rect.min.to_vec2()
+                + Vec2::new(0.0, PIANO_SIZE.y * (self.max_octave - octave) as f32);
+
+            if self.hit_key.is_none()
+                && clicking
+                && let Some(pointer) = pointer_at
+            {
+                self.hit_key = BLACK_RECTS
+                    .into_iter()
+                    .zip(BLACK_INDICES)
+                    .chain(WHITE_RECTS.into_iter().zip(WHITE_INDICES))
+                    .find(|(rect, _)| offset_rect(*rect, start).contains(pointer))
+                    .map(|(_, idx)| octave * 12 + idx);
+            }
+
+            for ((rect, idx), (color, click_color)) in WHITE_RECTS
+                .into_iter()
+                .zip(WHITE_INDICES)
+                .zip(iter::repeat((WHITE_KEY, WHITE_KEY_CLICK)))
+                .chain(
+                    BLACK_RECTS
                         .into_iter()
                         .zip(BLACK_INDICES)
-                        .chain(WHITE_RECTS.into_iter().zip(WHITE_INDICES))
-                        .find(|(rect, _)| offset_rect(*rect, start).contains(pointer))
-                        .map(|(_, idx)| octave * 12 + idx);
-                }
-
-                for ((rect, idx), (color, click_color)) in WHITE_RECTS
-                    .into_iter()
-                    .zip(WHITE_INDICES)
-                    .zip(iter::repeat((WHITE_KEY, WHITE_KEY_CLICK)))
-                    .chain(
-                        BLACK_RECTS
-                            .into_iter()
-                            .zip(BLACK_INDICES)
-                            .zip(iter::repeat((BLACK_KEY, BLACK_KEY_CLICK))),
-                    )
-                {
-                    let rect = offset_rect(rect, start);
-                    painter.rect_filled(
-                        rect,
-                        0.0,
-                        if Some(octave * 12 + idx) == self.hit_key {
-                            click_color
-                        } else {
-                            color
-                        },
-                    );
-                    painter.rect_stroke(
-                        rect,
-                        0.0,
-                        (STROKE_WIDTH, STROKE_COLOR),
-                        StrokeKind::Inside,
-                    );
-                }
-
-                painter.text(
-                    start.to_pos2() + PIANO_SIZE + Vec2::splat(-2.0),
-                    Align2::RIGHT_BOTTOM,
-                    format!("C{}", octave),
-                    FontId::proportional(10.0),
-                    Color32::BLACK,
+                        .zip(iter::repeat((BLACK_KEY, BLACK_KEY_CLICK))),
+                )
+            {
+                let rect = offset_rect(rect, start);
+                painter.rect_filled(
+                    rect,
+                    0.0,
+                    if Some(octave * 12 + idx) == self.hit_key {
+                        click_color
+                    } else {
+                        color
+                    },
                 );
+                painter.rect_stroke(rect, 0.0, (STROKE_WIDTH, STROKE_COLOR), StrokeKind::Inside);
             }
-        });
+
+            painter.text(
+                start.to_pos2() + PIANO_SIZE + Vec2::splat(-2.0),
+                Align2::RIGHT_BOTTOM,
+                format!("C{}", octave),
+                FontId::proportional(10.0),
+                Color32::BLACK,
+            );
+        }
     }
 }
