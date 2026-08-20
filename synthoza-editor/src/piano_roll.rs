@@ -113,6 +113,14 @@ impl PianoRoll {
                         StrokeKind::Inside,
                     );
                 }
+
+                painter.text(
+                    start.to_pos2() + PIANO_SIZE + Vec2::splat(-2.0),
+                    Align2::RIGHT_BOTTOM,
+                    format!("C{}", octave),
+                    FontId::proportional(10.0),
+                    Color32::BLACK,
+                );
             }
         });
     }
