@@ -1,6 +1,9 @@
 use iced::{
     Element, Length,
-    widget::{Canvas, scrollable},
+    widget::{
+        Canvas, scrollable,
+        scrollable::{Direction, Scrollbar},
+    },
 };
 
 use crate::piano::{Piano, PianoMsg};
@@ -46,9 +49,11 @@ impl State {
 
         Element::map(
             scrollable(piano)
+                .direction(Direction::Vertical(Scrollbar::hidden()))
                 .anchor_bottom()
                 .height(Length::Fill)
                 .width(100.0)
+                .auto_scroll(true)
                 .into(),
             Msg::PianoMsg,
         )

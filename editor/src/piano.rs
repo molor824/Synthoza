@@ -1,10 +1,14 @@
 use std::collections::HashMap;
 
 use iced::{
-    Color, Event, Point, Rectangle, Renderer, Size, Theme,
+    Color, Event, Pixels, Point, Rectangle, Renderer, Size, Theme,
+    alignment::Vertical,
     keyboard::{self, Key},
     mouse::{self, Cursor},
-    widget::canvas::{Action, Frame, Geometry, Program, Stroke},
+    widget::{
+        canvas::{Action, Frame, Geometry, Program, Stroke, Text},
+        text::Alignment,
+    },
 };
 
 const BLACK_KEY_COL: f32 = 0.1;
@@ -148,6 +152,17 @@ impl<'a> Program<PianoMsg> for Piano<'a> {
                     rect.size(),
                     Stroke::default().with_width(2.0),
                 );
+                if key == 0 {
+                    frame.fill_text(Text {
+                        content: format!("{}", i / 12),
+                        align_x: Alignment::Right,
+                        align_y: Vertical::Bottom,
+                        position: Point::new(rect.x + rect.width - 2.0, rect.y + rect.height),
+                        color: Color::BLACK,
+                        size: Pixels::from(rect.height * 0.7),
+                        ..Default::default()
+                    });
+                }
             }
         }
 
@@ -162,10 +177,11 @@ impl<'a> Program<PianoMsg> for Piano<'a> {
         cursor: Cursor,
     ) -> Option<Action<PianoMsg>> {
         match event {
-            Event::Mouse(mouse_event) if let Cursor::Available(cursor_pos) = cursor => {
+            Event::Mouse(mouse_event) => {
                 match mouse_event {
                     mouse::Event::ButtonPressed(mouse::Button::Left)
-                        if bounds.contains(cursor_pos) =>
+                        if let Cursor::Available(cursor_pos) = cursor
+                            && bounds.contains(cursor_pos) =>
                     {
                         state.mouse_clicked = true
                     }
@@ -178,7 +194,9 @@ impl<'a> Program<PianoMsg> for Piano<'a> {
                 let mut clicked_key: Option<usize> = None;
                 let key_size = self.key_size(bounds);
 
-                if state.mouse_clicked {
+                if state.mouse_clicked
+                    && let Cursor::Available(cursor_pos) = cursor
+                {
                     'outer: for i in (0..self.keys.len()).step_by(12) {
                         for key in KEY_RENDER_ORDER.into_iter().rev() {
                             let abs_key = key + i;
