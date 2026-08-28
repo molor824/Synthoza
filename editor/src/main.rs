@@ -37,9 +37,12 @@ impl State {
         }
     }
     fn view(&self) -> impl Into<Element<'_, Msg>> {
-        let piano = Canvas::new(Piano { keys: &self.keys })
-            .height(self.keys.len() as f32 * self.key_height)
-            .width(Length::Fill);
+        let piano = Canvas::new(Piano {
+            keys: &self.keys,
+            keyboard_octave: 0,
+        })
+        .height(self.keys.len() as f32 * self.key_height)
+        .width(Length::Fill);
 
         Element::map(
             scrollable(piano)

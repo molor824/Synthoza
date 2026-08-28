@@ -1,7 +1,8 @@
-use std::mem::transmute;
+use std::collections::HashMap;
 
 use iced::{
     Color, Event, Point, Rectangle, Renderer, Size, Theme,
+    keyboard::{self, Key},
     mouse::{self, Cursor},
     widget::canvas::{Action, Frame, Geometry, Program, Stroke},
 };
@@ -60,6 +61,18 @@ const KEY_WIDTH_SCALES: [f32; 12] = [
 ];
 const KEY_RENDER_ORDER: [usize; 12] = [0, 2, 4, 5, 7, 9, 11, 1, 3, 6, 8, 10];
 
+thread_local! {
+    static KEYBARD_KEY: HashMap<Key, usize> = [
+        "z", "s", "x", "d", "c", "v", "g", "b", "h", "n", "j", "m",
+        "q", "2", "w", "3", "e", "r", "5", "t", "6", "y", "7", "u", "i", "9", "o", "0", "p",
+    ].into_iter().enumerate().map(|(i, k)| (Key::Character(k.into()), i))
+        .chain(
+            [",", "l", ".", ";", "/"]
+                .into_iter().enumerate()
+                .map(|(i, k)| (Key::Character(k.into()), i + 12))
+        ).collect();
+}
+
 #[derive(Clone)]
 pub enum PianoMsg {
     KeyAdd(usize),
@@ -69,6 +82,7 @@ pub enum PianoMsg {
 
 pub struct Piano<'a> {
     pub keys: &'a [bool], // Key maps. This also determines the piano length
+    pub keyboard_octave: usize,
 }
 
 #[derive(Default, Debug)]
@@ -147,98 +161,70 @@ impl<'a> Program<PianoMsg> for Piano<'a> {
         bounds: Rectangle,
         cursor: Cursor,
     ) -> Option<Action<PianoMsg>> {
-        let Event::Mouse(mouse_event) = event else {
-            return None;
-        };
+        match event {
+            Event::Mouse(mouse_event) if let Cursor::Available(cursor_pos) = cursor => {
+                match mouse_event {
+                    mouse::Event::ButtonPressed(mouse::Button::Left)
+                        if bounds.contains(cursor_pos) =>
+                    {
+                        state.mouse_clicked = true
+                    }
+                    mouse::Event::ButtonReleased(mouse::Button::Left) => {
+                        state.mouse_clicked = false
+                    }
+                    _ => {}
+                }
 
-        match mouse_event {
-            mouse::Event::ButtonPressed(mouse::Button::Left) => state.mouse_clicked = true,
-            mouse::Event::ButtonReleased(mouse::Button::Left) => state.mouse_clicked = false,
-            _ => {}
-        }
+                let mut clicked_key: Option<usize> = None;
+                let key_size = self.key_size(bounds);
 
-        let mut clicked_key: Option<usize> = None;
-        let key_size = self.key_size(bounds);
+                if state.mouse_clicked {
+                    'outer: for i in (0..self.keys.len()).step_by(12) {
+                        for key in KEY_RENDER_ORDER.into_iter().rev() {
+                            let abs_key = key + i;
+                            let note_rect = self.note_rect(key_size, abs_key);
 
-        if state.mouse_clicked
-            && let Cursor::Available(cursor_pos) = cursor
-        {
-            'outer: for i in (0..self.keys.len()).step_by(12) {
-                for key in KEY_RENDER_ORDER.into_iter().rev() {
-                    let abs_key = key + i;
-                    let note_rect = self.note_rect(key_size, abs_key);
-
-                    if note_rect.contains(cursor_pos) {
-                        clicked_key = Some(abs_key);
-                        break 'outer;
+                            if note_rect.contains(cursor_pos) {
+                                clicked_key = Some(abs_key);
+                                break 'outer;
+                            }
+                        }
                     }
                 }
+
+                let msg = match clicked_key {
+                    Some(key) => match state.clicked_key {
+                        Some(state_key) if state_key == key => None,
+                        Some(state_key) => Some(PianoMsg::KeyChange(state_key, key)),
+                        None => Some(PianoMsg::KeyAdd(key)),
+                    },
+                    None => match state.clicked_key {
+                        Some(state_key) => Some(PianoMsg::KeyRemove(state_key)),
+                        None => None,
+                    },
+                };
+
+                state.clicked_key = clicked_key;
+
+                return msg.map(|msg| Action::publish(msg));
             }
-        }
-
-        let msg = match clicked_key {
-            Some(key) => match state.clicked_key {
-                Some(state_key) if state_key == key => None,
-                Some(state_key) => Some(PianoMsg::KeyChange(state_key, key)),
-                None => Some(PianoMsg::KeyAdd(key)),
+            Event::Keyboard(kbd_event) => match kbd_event {
+                keyboard::Event::KeyPressed { key, .. }
+                | keyboard::Event::KeyReleased { key, .. } => {
+                    let piano_key = KEYBARD_KEY
+                        .with(|map| map.get(&key).copied())
+                        .map(|k| k + self.keyboard_octave * 12);
+                    return piano_key.map(|key| {
+                        Action::publish(match kbd_event {
+                            keyboard::Event::KeyPressed { .. } => PianoMsg::KeyAdd(key),
+                            _ => PianoMsg::KeyRemove(key),
+                        })
+                    });
+                }
+                _ => {}
             },
-            None => match state.clicked_key {
-                Some(state_key) => Some(PianoMsg::KeyRemove(state_key)),
-                None => None,
-            },
-        };
-
-        state.clicked_key = clicked_key;
-
-        msg.map(|msg| Action::publish(msg))
-    }
-}
-
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Note {
-    C,
-    CSharp,
-    D,
-    DSharp,
-    E,
-    F,
-    FSharp,
-    G,
-    GSharp,
-    A,
-    ASharp,
-    B,
-}
-impl TryFrom<u8> for Note {
-    type Error = String;
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value >= 12 {
-            return Err(format!("value {value} cannot be converted to note"));
+            _ => {}
         }
-        Ok(unsafe { transmute(value) })
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Key(pub u32);
-impl Key {
-    pub const fn new(note: Note, octave: u32) -> Self {
-        Self(octave * 12 + note as u8 as u32)
-    }
-    pub fn note(self) -> Note {
-        Note::try_from((self.0 % 12) as u8).unwrap()
-    }
-    pub fn octave(self) -> u32 {
-        self.0 / 12
-    }
-    pub fn pitch_c0_freq(self, c0_freq: f32) -> f32 {
-        2.0_f32.powf(self.0 as f32 / 12.0) * c0_freq
-    }
-    pub fn pitch_a4_freq(self, a4_freq: f32) -> f32 {
-        2.0_f32.powf((self.0 - Self::new(Note::A, 4).0) as f32 / 12.0) * a4_freq
-    }
-    pub fn pitch_standard(self) -> f32 {
-        self.pitch_a4_freq(440.0)
+        None
     }
 }
