@@ -224,7 +224,7 @@ impl<'a> Program<PianoMsg> for Piano<'a> {
 
                 state.clicked_key = clicked_key;
 
-                return msg.map(|msg| Action::publish(msg));
+                return msg.map(Action::publish);
             }
             Event::Keyboard(kbd_event) => match kbd_event {
                 keyboard::Event::KeyPressed { key, .. }
@@ -232,12 +232,21 @@ impl<'a> Program<PianoMsg> for Piano<'a> {
                     let piano_key = KEYBARD_KEY
                         .with(|map| map.get(&key).copied())
                         .map(|k| k + self.keyboard_octave * 12);
-                    return piano_key.map(|key| {
-                        Action::publish(match kbd_event {
-                            keyboard::Event::KeyPressed { .. } => PianoMsg::KeyAdd(key),
-                            _ => PianoMsg::KeyRemove(key),
-                        })
-                    });
+
+                    if let Some(key) = piano_key
+                        && let Some(&pressed) = self.keys.get(key)
+                    {
+                        return match kbd_event {
+                            keyboard::Event::KeyPressed { .. } if !pressed => {
+                                Some(PianoMsg::KeyAdd(key))
+                            }
+                            keyboard::Event::KeyReleased { .. } if pressed => {
+                                Some(PianoMsg::KeyRemove(key))
+                            }
+                            _ => None,
+                        }
+                        .map(Action::publish);
+                    }
                 }
                 _ => {}
             },
