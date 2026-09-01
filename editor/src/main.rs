@@ -1,67 +1,33 @@
-use iced::{
-    Element, Length,
-    widget::{
-        Canvas, scrollable,
-        scrollable::{Direction, Scrollbar},
-    },
-};
+use iced::Element;
 
-use crate::piano::{Piano, PianoMsg};
+use crate::piano_roll::PianoRoll;
 
+mod note_field;
 mod piano;
+mod piano_roll;
 
-struct State {
-    keys: Vec<bool>,
-    key_height: f32,
+#[derive(Default)]
+struct Model {
+    piano_roll: PianoRoll,
 }
 
-#[derive(Clone)]
 enum Msg {
-    PianoMsg(PianoMsg),
+    PianoRoll(piano_roll::Msg),
 }
 
-impl State {
-    fn new() -> Self {
-        Self {
-            keys: vec![false; 12 * 10],
-            key_height: 15.0,
-        }
-    }
+impl Model {
     fn update(&mut self, msg: Msg) {
         match msg {
-            Msg::PianoMsg(msg) => match msg {
-                PianoMsg::KeyAdd(key) => self.keys[key] = true,
-                PianoMsg::KeyRemove(key) => self.keys[key] = false,
-                PianoMsg::KeyChange(from, to) => {
-                    self.keys[from] = false;
-                    self.keys[to] = true;
-                }
-            },
+            Msg::PianoRoll(msg) => self.piano_roll.update(msg),
         }
     }
     fn view(&self) -> impl Into<Element<'_, Msg>> {
-        let piano = Canvas::new(Piano {
-            keys: &self.keys,
-            keyboard_octave: 0,
-        })
-        .height(self.keys.len() as f32 * self.key_height)
-        .width(Length::Fill);
-
-        Element::map(
-            scrollable(piano)
-                .direction(Direction::Vertical(Scrollbar::hidden()))
-                .anchor_bottom()
-                .height(Length::Fill)
-                .width(100.0)
-                .auto_scroll(true)
-                .into(),
-            Msg::PianoMsg,
-        )
+        self.piano_roll.view().into().map(Msg::PianoRoll)
     }
 }
 
 fn main() {
-    iced::application(State::new, State::update, State::view)
+    iced::application(Model::default, Model::update, Model::view)
         .antialiasing(true)
         .resizable(true)
         .run()
