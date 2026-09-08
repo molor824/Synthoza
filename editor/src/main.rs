@@ -36,7 +36,7 @@ impl eframe::App for App {
             ui.label(format!("Frame: {}", self.frame_count));
         });
         ScrollArea::vertical()
-            .max_height(ui.available_size().y - 20.0)
+            .max_height(ui.available_size().y)
             .stick_to_bottom(true)
             .show(ui, |ui| {
                 self.piano_roll.show(ui);
