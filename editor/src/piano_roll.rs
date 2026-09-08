@@ -1,12 +1,11 @@
+use eframe::egui::*;
 use std::{iter, sync::LazyLock};
 
-use eframe::egui::*;
-
 const WHITE_KEY: Rgba = Rgba::from_rgb(0.9, 0.9, 0.9);
-const WHITE_KEY_CLICK: Rgba = Rgba::from_rgb(0.7, 0.7, 0.7);
+const WHITE_KEY_CLICK: Rgba = Rgba::from_rgb(0.6, 0.6, 0.6);
 
-const BLACK_KEY: Rgba = Rgba::from_rgb(0.1, 0.1, 0.1);
-const BLACK_KEY_CLICK: Rgba = Rgba::from_rgb(0.3, 0.3, 0.3);
+const BLACK_KEY: Rgba = Rgba::from_rgb(0.05, 0.05, 0.05);
+const BLACK_KEY_CLICK: Rgba = Rgba::from_rgb(0.15, 0.15, 0.15);
 
 const KEY_WIDTH: f32 = 10.0;
 const KEY_HEIGHT: f32 = 60.0;
@@ -45,33 +44,81 @@ fn offset_rect(rect: Rect, offset: Vec2) -> Rect {
     }
 }
 
+const KEYBOARD_KEYS: [(Key, usize); 17 * 2] = [
+    (Key::Z, 0),
+    (Key::S, 1),
+    (Key::X, 2),
+    (Key::D, 3),
+    (Key::C, 4),
+    (Key::V, 5),
+    (Key::G, 6),
+    (Key::B, 7),
+    (Key::H, 8),
+    (Key::N, 9),
+    (Key::J, 10),
+    (Key::M, 11),
+    (Key::Comma, 12),
+    (Key::L, 13),
+    (Key::Period, 14),
+    (Key::Semicolon, 15),
+    (Key::Slash, 16),
+    (Key::Q, 12),
+    (Key::Num2, 13),
+    (Key::W, 14),
+    (Key::Num3, 15),
+    (Key::E, 16),
+    (Key::R, 17),
+    (Key::Num5, 18),
+    (Key::T, 19),
+    (Key::Num6, 20),
+    (Key::Y, 21),
+    (Key::Num7, 22),
+    (Key::U, 23),
+    (Key::I, 24),
+    (Key::Num9, 25),
+    (Key::O, 26),
+    (Key::Num0, 27),
+    (Key::P, 28),
+];
+
 pub struct PianoRoll {
-    max_octave: usize,
-    hit_key: Option<usize>, // starting at C0 - 0, D0 - 1 etc...
+    octaves: usize,
+    kbd_octave: usize,
+    mouse_key: Option<usize>, // starting at C0 - 0, D0 - 1 etc...
+    kbd_keys: [bool; KEYBOARD_KEYS.len()], // Keyboard keys ordered, and represents its equivalent indexed notes.
 }
 
 impl Default for PianoRoll {
     fn default() -> Self {
         Self {
-            max_octave: 10,
-            hit_key: None,
+            octaves: 10,
+            kbd_octave: 3,
+            mouse_key: None,
+            kbd_keys: KEYBOARD_KEYS.map(|_| false),
         }
     }
 }
 impl PianoRoll {
     pub fn show(&mut self, ui: &mut Ui) {
-        self.hit_key = None;
-
         ui.horizontal(|ui| {
             self.show_piano(ui);
             self.show_notes(ui);
         });
     }
 
+    pub fn pressed(&self, key: usize) -> bool {
+        self.mouse_key == Some(key)
+            || self
+                .kbd_keys
+                .into_iter()
+                .zip(KEYBOARD_KEYS)
+                .any(|(pressed, (_, offset))| offset + self.kbd_octave * 12 == key && pressed)
+    }
+
     fn show_notes(&mut self, ui: &mut Ui) {
         let full_rect = Vec2::new(
             ui.available_width(),
-            PIANO_SIZE.y * (self.max_octave + 1) as f32,
+            PIANO_SIZE.y * (self.octaves + 1) as f32,
         );
         let (response, painter) = ui.allocate_painter(full_rect, Sense::DRAG | Sense::CLICK);
         let render_rect = response.rect;
@@ -80,27 +127,50 @@ impl PianoRoll {
     }
 
     fn show_piano(&mut self, ui: &mut Ui) {
-        let full_rect = PIANO_SIZE * Vec2::new(1.0, (self.max_octave + 1) as f32);
+        let full_rect = PIANO_SIZE * Vec2::new(1.0, (self.octaves + 1) as f32);
         let (response, painter) = ui.allocate_painter(full_rect, Sense::DRAG | Sense::CLICK);
         let render_rect = response.rect;
         let clicking = response.is_pointer_button_down_on();
         let pointer_at = ui.input(|i| i.pointer.latest_pos());
 
-        for octave in 0..=self.max_octave {
-            let start = render_rect.min.to_vec2()
-                + Vec2::new(0.0, PIANO_SIZE.y * (self.max_octave - octave) as f32);
+        self.mouse_key = None;
 
-            if self.hit_key.is_none()
-                && clicking
-                && let Some(pointer) = pointer_at
-            {
-                self.hit_key = BLACK_RECTS
-                    .into_iter()
-                    .zip(BLACK_INDICES)
-                    .chain(WHITE_RECTS.into_iter().zip(WHITE_INDICES))
-                    .find(|(rect, _)| offset_rect(*rect, start).contains(pointer))
-                    .map(|(_, idx)| octave * 12 + idx);
+        ui.ctx().input(|input| {
+            for (i, (key, _)) in KEYBOARD_KEYS.into_iter().enumerate() {
+                for event in input.events.iter() {
+                    match event {
+                        Event::Key {
+                            physical_key: Some(key1),
+                            pressed,
+                            ..
+                        } if *key1 == key => self.kbd_keys[i] = *pressed,
+                        _ => {}
+                    }
+                }
             }
+        });
+
+        if clicking && let Some(pointer) = pointer_at {
+            for octave in 0..=self.octaves {
+                let start = render_rect.min.to_vec2()
+                    + Vec2::new(0.0, PIANO_SIZE.y * (self.octaves - octave) as f32);
+
+                if let None = self.mouse_key {
+                    self.mouse_key = BLACK_RECTS
+                        .into_iter()
+                        .zip(BLACK_INDICES)
+                        .chain(WHITE_RECTS.into_iter().zip(WHITE_INDICES))
+                        .find(|(rect, _)| offset_rect(*rect, start).contains(pointer))
+                        .map(|(_, idx)| octave * 12 + idx);
+                } else {
+                    break;
+                }
+            }
+        }
+
+        for octave in 0..=self.octaves {
+            let start = render_rect.min.to_vec2()
+                + Vec2::new(0.0, PIANO_SIZE.y * (self.octaves - octave) as f32);
 
             for ((rect, idx), (color, click_color)) in WHITE_RECTS
                 .into_iter()
@@ -117,7 +187,7 @@ impl PianoRoll {
                 painter.rect_filled(
                     rect,
                     0.0,
-                    if Some(octave * 12 + idx) == self.hit_key {
+                    if self.pressed(octave * 12 + idx) {
                         click_color
                     } else {
                         color
