@@ -1,35 +1,33 @@
-use iced::Element;
-
-use crate::piano_roll::PianoRoll;
-
-mod note_field;
-mod piano;
 mod piano_roll;
 
-#[derive(Default)]
-struct Model {
+use crate::piano_roll::PianoRoll;
+use eframe::egui::{ScrollArea, Ui};
+
+fn main() {
+    let native_options = eframe::NativeOptions::default();
+    eframe::run_native(
+        "Synthoza",
+        native_options,
+        Box::new(|cc| Ok(Box::new(App::new(cc)))),
+    )
+    .unwrap();
+}
+
+struct App {
     piano_roll: PianoRoll,
 }
 
-enum Msg {
-    PianoRoll(piano_roll::Msg),
-}
-
-impl Model {
-    fn update(&mut self, msg: Msg) {
-        match msg {
-            Msg::PianoRoll(msg) => self.piano_roll.update(msg),
+impl App {
+    fn new(_cc: &eframe::CreationContext) -> Self {
+        Self {
+            piano_roll: PianoRoll::default(),
         }
     }
-    fn view(&self) -> impl Into<Element<'_, Msg>> {
-        self.piano_roll.view().into().map(Msg::PianoRoll)
-    }
 }
-
-fn main() {
-    iced::application(Model::default, Model::update, Model::view)
-        .antialiasing(true)
-        .resizable(true)
-        .run()
-        .unwrap();
+impl eframe::App for App {
+    fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+        ScrollArea::vertical().show(ui, |ui| {
+            self.piano_roll.show(ui);
+        });
+    }
 }
