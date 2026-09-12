@@ -1,5 +1,6 @@
 use eframe::egui::*;
 use std::{iter, sync::LazyLock};
+use std::num::NonZeroUsize;
 
 const WHITE_KEY: Rgba = Rgba::from_rgb(0.9, 0.9, 0.9);
 const WHITE_KEY_CLICK: Rgba = Rgba::from_rgb(0.6, 0.6, 0.6);
@@ -36,6 +37,8 @@ static BLACK_RECTS: LazyLock<[Rect; 5]> = LazyLock::new(|| {
 });
 const BLACK_INDICES: [usize; 5] = [10, 8, 6, 3, 1];
 const WHITE_INDICES: [usize; 7] = [11, 9, 7, 5, 4, 2, 0];
+
+const OCTAVES: usize = 10;
 
 fn offset_rect(rect: Rect, offset: Vec2) -> Rect {
     Rect {
@@ -82,58 +85,23 @@ const KEYBOARD_KEYS: [(Key, usize); 17 * 2] = [
 ];
 const KEYBOARD_MAX_OFFSET: usize = KEYBOARD_KEYS[KEYBOARD_KEYS.len() - 1].1;
 
-pub struct PianoRoll {
-    octaves: usize,
+pub struct Piano {
     kbd_octave: usize,
     mouse_key: Option<usize>, // starting at C0 - 0, D0 - 1 etc...
     kbd_keys: [bool; KEYBOARD_KEYS.len()], // Keyboard keys ordered, and represents its equivalent indexed notes.
 }
-
-impl Default for PianoRoll {
+impl Default for Piano {
     fn default() -> Self {
         Self {
-            octaves: 10,
-            kbd_octave: 3,
+            kbd_octave: 4,
             mouse_key: None,
-            kbd_keys: KEYBOARD_KEYS.map(|_| false),
+            kbd_keys: [false; _],
         }
     }
 }
-impl PianoRoll {
+impl Piano {
     pub fn show(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            self.show_piano(ui);
-            self.show_notes(ui);
-        });
-    }
-
-    pub fn pressed(&self, key: usize) -> bool {
-        let kbd_start = self.kbd_octave * 12;
-        let kbd_end = kbd_start + KEYBOARD_MAX_OFFSET;
-        self.mouse_key == Some(key)
-            || (key >= kbd_start
-                && key <= kbd_end
-                && self
-                    .kbd_keys
-                    .into_iter()
-                    .zip(KEYBOARD_KEYS)
-                    .any(|(pressed, (_, offset))| offset + self.kbd_octave * 12 == key && pressed))
-    }
-
-    fn show_notes(&mut self, ui: &mut Ui) {
-        let full_rect = Vec2::new(ui.available_width(), PIANO_SIZE.y * self.octaves as f32);
-        let (response, painter) = ui.allocate_painter(full_rect, Sense::DRAG | Sense::CLICK);
-        let render_rect = response.rect;
-        let clicking = response.is_pointer_button_down_on();
-        let pointer_at = ui.input(|i| i.pointer.latest_pos());
-    }
-
-    fn octave_start(&self, octave: usize) -> Vec2 {
-        Vec2::new(0.0, PIANO_SIZE.y * (self.octaves - octave - 1) as f32)
-    }
-
-    fn show_piano(&mut self, ui: &mut Ui) {
-        let full_rect = PIANO_SIZE * Vec2::new(1.0, self.octaves as f32);
+        let full_rect = PIANO_SIZE * Vec2::new(1.0, OCTAVES as f32);
         let (response, painter) = ui.allocate_painter(full_rect, Sense::click_and_drag());
         let render_rect = response.rect;
         let clicking = response.is_pointer_button_down_on()
@@ -141,23 +109,23 @@ impl PianoRoll {
         let pointer_at = ui.input(|i| i.pointer.latest_pos());
 
         ui.ctx().input(|input| {
-            for (i, (key, _)) in KEYBOARD_KEYS.into_iter().enumerate() {
-                for event in input.events.iter() {
-                    match event {
-                        Event::Key {
-                            physical_key: Some(key1),
-                            pressed,
-                            ..
-                        } if *key1 == key => self.kbd_keys[i] = *pressed,
-                        _ => {}
+            for event in input.events.iter() {
+                match event {
+                    Event::Key {
+                        physical_key: Some(key),
+                        pressed,
+                        ..
+                    } if let Some(i) = KEYBOARD_KEYS.iter().find(|k| k.0 == *key).map(|k| k.1) => {
+                        self.kbd_keys[i] = *pressed;
                     }
+                    _ => {}
                 }
             }
         });
 
         self.mouse_key = None;
         if clicking && let Some(pointer) = pointer_at {
-            for octave in 0..self.octaves {
+            for octave in 0..OCTAVES {
                 if self.mouse_key.is_some() {
                     break;
                 }
@@ -173,7 +141,7 @@ impl PianoRoll {
             }
         }
 
-        for octave in 0..self.octaves {
+        for octave in 0..OCTAVES {
             let start = render_rect.min.to_vec2() + self.octave_start(octave);
 
             for ((rect, idx), (color, click_color)) in WHITE_RECTS
@@ -208,5 +176,66 @@ impl PianoRoll {
                 Color32::BLACK,
             );
         }
+    }
+    fn octave_start(&self, octave: usize) -> Vec2 {
+        Vec2::new(0.0, PIANO_SIZE.y * (OCTAVES - octave - 1) as f32)
+    }
+    pub fn pressed(&self, key: usize) -> bool {
+        let kbd_start = self.kbd_octave * 12;
+        let kbd_end = kbd_start + KEYBOARD_MAX_OFFSET;
+        self.mouse_key == Some(key)
+            || (key >= kbd_start
+                && key <= kbd_end
+                && self
+                    .kbd_keys
+                    .into_iter()
+                    .zip(KEYBOARD_KEYS)
+                    .any(|(pressed, (_, offset))| offset + self.kbd_octave * 12 == key && pressed))
+    }
+}
+
+#[derive(Default)]
+pub struct NoteEditor {
+    notes: Vec<Note>, // Must be ordered by Note::begin!!!
+}
+
+impl NoteEditor {
+    pub fn show(&mut self, ui: &mut Ui) {
+        let (response, painter) = ui.allocate_painter(todo!(), Sense::click_and_drag());
+    }
+}
+
+pub struct Note {
+    pub begin: f32, // measured in seconds
+    pub end: f32,
+    pub key: usize,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct TimeSignature {
+    pub value: NonZeroUsize,
+    pub signature: NonZeroUsize,
+}
+impl Default for TimeSignature {
+    fn default() -> Self {
+        Self {
+            value: NonZeroUsize::new(4).unwrap(),
+            signature: NonZeroUsize::new(4).unwrap(),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct PianoRoll {
+    piano: Piano,
+    editor: NoteEditor,
+}
+
+impl PianoRoll {
+    pub fn show(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            self.piano.show(ui);
+            self.editor.show(ui);
+        });
     }
 }
