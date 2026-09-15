@@ -17,29 +17,23 @@ fn main() {
 
 struct App {
     piano_roll: PianoRoll,
-    frame_count: u64,
 }
 
 impl App {
     fn new(_cc: &eframe::CreationContext) -> Self {
         Self {
             piano_roll: PianoRoll::default(),
-            frame_count: 0,
         }
     }
 }
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
-        self.frame_count += 1;
-
         ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
             self.piano_roll.show(ui);
         });
-        Area::new(Id::new("frame_count"))
-            .anchor(Align2::RIGHT_BOTTOM, Vec2::splat(-8.0))
-            .interactable(false)
-            .show(ui.ctx(), |ui| {
-                ui.label(format!("Frame {}", self.frame_count));
-            });
+
+        if cfg!(debug_assertions) {
+            ui.request_repaint();
+        }
     }
 }
