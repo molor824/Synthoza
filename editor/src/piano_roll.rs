@@ -202,7 +202,7 @@ pub struct NoteEditor {
     notes: Vec<Note>, // Must be ordered by Note::begin!!!
     signature: TimeSignature,
     bars: usize,
-    bar_width: f32,
+    note_width: f32, // Measured in whole note
 }
 impl Default for NoteEditor {
     fn default() -> Self {
@@ -210,7 +210,7 @@ impl Default for NoteEditor {
             notes: vec![],
             signature: TimeSignature::default(),
             bars: 4,
-            bar_width: 200.0,
+            note_width: 200.0,
         }
     }
 }
@@ -229,8 +229,10 @@ const BLACK_HIGHLIGHT_GRAY: f32 = 0.03;
 
 impl NoteEditor {
     pub fn show(&mut self, ui: &mut Ui, piano: &Piano) {
+        let value_width = self.note_width / self.signature.value.get() as f32;
+        let bar_width = value_width * self.signature.measure.get() as f32;
         let full_size = Vec2::new(
-            self.bar_width * self.bars as f32,
+            bar_width * self.bars as f32,
             piano.key_height * 12.0 * OCTAVES as f32,
         );
         let (response, painter) = ui.allocate_painter(full_size, Sense::click_and_drag());
@@ -275,7 +277,7 @@ impl NoteEditor {
         }
 
         for b in 0..=self.bars {
-            let x = render_rect.min.x + self.bar_width * b as f32;
+            let x = render_rect.min.x + bar_width * b as f32;
             painter.vline(x, render_rect.y_range(), major_stroke);
 
             if b == self.bars {
@@ -284,7 +286,7 @@ impl NoteEditor {
 
             for i in 1..self.signature.measure.get() {
                 painter.vline(
-                    x + self.bar_width / self.signature.measure.get() as f32 * i as f32,
+                    x + value_width * i as f32,
                     render_rect.y_range(),
                     minor_stroke,
                 );
@@ -321,9 +323,22 @@ pub struct PianoRoll {
 
 impl PianoRoll {
     pub fn show(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            self.piano.show(ui);
-            ScrollArea::horizontal().show(ui, |ui| self.editor.show(ui, &self.piano));
-        });
+        Window::new("Piano roll")
+            .default_size(ui.available_size())
+            .show(ui.ctx(), |ui| {
+                Grid::new("piano_roll_grid").show(ui, |ui| {
+                    ui.label("Measure:");
+                    ui.add(DragValue::new(&mut self.editor.signature.measure).range(1..=(1 << 8)));
+                    ui.end_row();
+                    ui.label("Value:");
+                    ui.add(DragValue::new(&mut self.editor.signature.value).range(1..=(1 << 8)));
+                });
+                ScrollArea::vertical().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        self.piano.show(ui);
+                        ScrollArea::horizontal().show(ui, |ui| self.editor.show(ui, &self.piano));
+                    })
+                });
+            });
     }
 }
