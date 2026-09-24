@@ -326,12 +326,20 @@ impl PianoRoll {
         Window::new("Piano roll")
             .default_size(ui.available_size())
             .show(ui.ctx(), |ui| {
-                Grid::new("piano_roll_grid").show(ui, |ui| {
-                    ui.label("Measure:");
-                    ui.add(DragValue::new(&mut self.editor.signature.measure).range(1..=(1 << 8)));
-                    ui.end_row();
-                    ui.label("Value:");
-                    ui.add(DragValue::new(&mut self.editor.signature.value).range(1..=(1 << 8)));
+                ui.horizontal(|ui| {
+                    Grid::new("piano_roll_grid").show(ui, |ui| {
+                        ui.label("Measure");
+                        ui.add(
+                            DragValue::new(&mut self.editor.signature.measure).range(1..=(1 << 8)),
+                        );
+                        ui.end_row();
+                        ui.label("Value");
+                        ui.add(
+                            DragValue::new(&mut self.editor.signature.value).range(1..=(1 << 8)),
+                        );
+                    });
+                    ui.label("Keyboard octave");
+                    ui.add(DragValue::new(&mut self.piano.kbd_octave).range(0..=(OCTAVES - 1)));
                 });
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.horizontal(|ui| {

@@ -1,7 +1,7 @@
 mod piano_roll;
 
 use crate::piano_roll::PianoRoll;
-use eframe::egui::{Align, Align2, Area, Id, Layout, Order, ScrollArea, Ui, Vec2};
+use eframe::egui::{ScrollArea, Ui};
 
 fn main() {
     let native_options = eframe::NativeOptions {
