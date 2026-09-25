@@ -1,10 +1,11 @@
 mod piano_roll;
 
 use crate::piano_roll::PianoRoll;
-use eframe::egui::{ScrollArea, Ui};
+use eframe::egui::{ScrollArea, Ui, ViewportBuilder};
 
 fn main() {
     let native_options = eframe::NativeOptions {
+        viewport: ViewportBuilder::default().with_maximized(true),
         ..Default::default()
     };
     eframe::run_native(
@@ -32,8 +33,8 @@ impl eframe::App for App {
             self.piano_roll.show(ui);
         });
 
-        if cfg!(debug_assertions) {
-            ui.request_repaint();
-        }
+        // if cfg!(debug_assertions) {
+        //     ui.request_repaint();
+        // }
     }
 }

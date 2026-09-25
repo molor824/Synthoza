@@ -203,6 +203,8 @@ pub struct NoteEditor {
     signature: TimeSignature,
     bars: usize,
     note_width: f32, // Measured in whole note
+    division: NonZeroUsize,
+    snapping: bool,
 }
 impl Default for NoteEditor {
     fn default() -> Self {
@@ -211,6 +213,8 @@ impl Default for NoteEditor {
             signature: TimeSignature::default(),
             bars: 4,
             note_width: 200.0,
+            snapping: false,
+            division: NonZeroUsize::new(1).unwrap(),
         }
     }
 }
@@ -223,6 +227,9 @@ const MAJOR_STROKE_ALPHA: f32 = 0.5;
 
 const MINOR_STROKE_WIDTH: f32 = 1.0;
 const MINOR_STROKE_ALPHA: f32 = 0.3;
+
+const SNAP_STROKE_WIDTH: f32 = 1.0;
+const SNAP_STROKE_ALPHA: f32 = 0.1;
 
 const WHITE_HIGHLIGHT_GRAY: f32 = 0.05;
 const BLACK_HIGHLIGHT_GRAY: f32 = 0.03;
@@ -247,6 +254,7 @@ impl NoteEditor {
             MINOR_STROKE_WIDTH,
             Rgba::from_white_alpha(MINOR_STROKE_ALPHA),
         );
+        let snap_stroke = Stroke::new(SNAP_STROKE_WIDTH, Rgba::from_white_alpha(SNAP_STROKE_ALPHA));
 
         let white_highlight = Rgba::from_gray(WHITE_HIGHLIGHT_GRAY);
         let black_highlight = Rgba::from_gray(BLACK_HIGHLIGHT_GRAY);
@@ -284,12 +292,19 @@ impl NoteEditor {
                 break;
             }
 
-            for i in 1..self.signature.measure.get() {
-                painter.vline(
-                    x + value_width * i as f32,
-                    render_rect.y_range(),
-                    minor_stroke,
-                );
+            for i in 0..self.signature.measure.get() {
+                let x = x + value_width * i as f32;
+                if i > 0 {
+                    painter.vline(x, render_rect.y_range(), minor_stroke);
+                }
+
+                if self.snapping {
+                    let snap_width = value_width / self.division.get() as f32;
+                    for i in 1..self.division.get() {
+                        let x = x + snap_width * i as f32;
+                        painter.vline(x, render_rect.y_range(), snap_stroke);
+                    }
+                }
             }
         }
     }
@@ -315,6 +330,19 @@ impl Default for TimeSignature {
     }
 }
 
+const COMMON_DIVS: [(usize, &str); 10] = [
+    (0, "No snap"),
+    (1, "1x"),
+    (2, "1/2x"),
+    (3, "1/3x"),
+    (4, "1/4x"),
+    (6, "1/6x"),
+    (8, "1/8x"),
+    (12, "1/12x"),
+    (16, "1/16x"),
+    (32, "1/32x"),
+];
+
 #[derive(Default)]
 pub struct PianoRoll {
     piano: Piano,
@@ -338,8 +366,38 @@ impl PianoRoll {
                             DragValue::new(&mut self.editor.signature.value).range(1..=(1 << 8)),
                         );
                     });
-                    ui.label("Keyboard octave");
-                    ui.add(DragValue::new(&mut self.piano.kbd_octave).range(0..=(OCTAVES - 1)));
+                    ui.vertical(|ui| {
+                        ui.label("Keyboard octave");
+                        ui.add(DragValue::new(&mut self.piano.kbd_octave).range(0..=(OCTAVES - 1)));
+                    });
+                    ui.vertical(|ui| {
+                        ui.checkbox(&mut self.editor.snapping, "Snap");
+                        ui.add_enabled(
+                            self.editor.snapping,
+                            DragValue::new(&mut self.editor.division).range(1..=(1 << 8)),
+                        );
+                    });
+                    let mut division = if self.editor.snapping {
+                        self.editor.division.get()
+                    } else {
+                        0
+                    };
+                    let common = COMMON_DIVS
+                        .into_iter()
+                        .find(|(d, _)| *d == division)
+                        .map(|(_, str)| str);
+                    ComboBox::from_id_salt("common_snaps")
+                        .selected_text(common.unwrap_or("Custom"))
+                        .show_ui(ui, |ui| {
+                            for (div, str) in COMMON_DIVS {
+                                ui.selectable_value(&mut division, div, str);
+                            }
+                        });
+
+                    self.editor.snapping = division != 0;
+                    if let Some(div) = NonZeroUsize::new(division) {
+                        self.editor.division = div;
+                    }
                 });
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.horizontal(|ui| {
