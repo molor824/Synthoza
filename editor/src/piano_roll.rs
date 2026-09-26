@@ -225,8 +225,8 @@ const OCTAVE_STROKE_GRAY: f32 = BLACK_HIGHLIGHT_GRAY;
 const MAJOR_STROKE_WIDTH: f32 = 2.0;
 const MAJOR_STROKE_ALPHA: f32 = 0.5;
 
-const MINOR_STROKE_WIDTH: f32 = 1.0;
-const MINOR_STROKE_ALPHA: f32 = 0.3;
+const MINOR_STROKE_WIDTH: f32 = 1.5;
+const MINOR_STROKE_ALPHA: f32 = 0.25;
 
 const SNAP_STROKE_WIDTH: f32 = 1.0;
 const SNAP_STROKE_ALPHA: f32 = 0.1;
@@ -330,7 +330,7 @@ impl Default for TimeSignature {
     }
 }
 
-const COMMON_DIVS: [(usize, &str); 10] = [
+const COMMON_DIVS: [(usize, &str); 9] = [
     (0, "No snap"),
     (1, "1x"),
     (2, "1/2x"),
@@ -340,7 +340,6 @@ const COMMON_DIVS: [(usize, &str); 10] = [
     (8, "1/8x"),
     (12, "1/12x"),
     (16, "1/16x"),
-    (32, "1/32x"),
 ];
 
 #[derive(Default)]
@@ -358,12 +357,12 @@ impl PianoRoll {
                     Grid::new("piano_roll_grid").show(ui, |ui| {
                         ui.label("Measure");
                         ui.add(
-                            DragValue::new(&mut self.editor.signature.measure).range(1..=(1 << 8)),
+                            DragValue::new(&mut self.editor.signature.measure).range(1..=256),
                         );
                         ui.end_row();
                         ui.label("Value");
                         ui.add(
-                            DragValue::new(&mut self.editor.signature.value).range(1..=(1 << 8)),
+                            DragValue::new(&mut self.editor.signature.value).range(1..=256),
                         );
                     });
                     ui.vertical(|ui| {
@@ -374,9 +373,10 @@ impl PianoRoll {
                         ui.checkbox(&mut self.editor.snapping, "Snap");
                         ui.add_enabled(
                             self.editor.snapping,
-                            DragValue::new(&mut self.editor.division).range(1..=(1 << 8)),
+                            DragValue::new(&mut self.editor.division).range(1..=64),
                         );
                     });
+
                     let mut division = if self.editor.snapping {
                         self.editor.division.get()
                     } else {
