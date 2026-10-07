@@ -198,13 +198,21 @@ impl Piano {
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct NoteDrag {
+    end: bool,
+    index: Option<usize>, // None for new note, Some for existing note
+    note: Note,
+}
 pub struct NoteEditor {
     notes: Vec<Note>, // Must be ordered by Note::begin!!!
     signature: TimeSignature,
     bars: usize,
-    note_width: f32, // Measured in whole note
+    whole_note_width: f32, // Measured in whole note
     division: NonZeroUsize,
     snapping: bool,
+    current_note_width: f32,
+    note_drag: Option<NoteDrag>,
 }
 impl Default for NoteEditor {
     fn default() -> Self {
@@ -212,9 +220,11 @@ impl Default for NoteEditor {
             notes: vec![],
             signature: TimeSignature::default(),
             bars: 4,
-            note_width: 200.0,
-            snapping: false,
+            whole_note_width: 200.0,
+            snapping: true,
             division: NonZeroUsize::new(1).unwrap(),
+            current_note_width: 0.25, // quarter note by default (most common note probably)
+            note_drag: None,
         }
     }
 }
@@ -234,9 +244,11 @@ const SNAP_STROKE_ALPHA: f32 = 0.1;
 const WHITE_HIGHLIGHT_GRAY: f32 = 0.05;
 const BLACK_HIGHLIGHT_GRAY: f32 = 0.03;
 
+const GHOST_NOTE_ALPHA: f32 = 0.3;
+
 impl NoteEditor {
-    pub fn show(&mut self, ui: &mut Ui, piano: &Piano) {
-        let value_width = self.note_width / self.signature.value.get() as f32;
+    fn show_grid(&mut self, ui: &mut Ui, piano: &Piano) -> (Response, Painter) {
+        let value_width = self.whole_note_width / self.signature.value.get() as f32;
         let bar_width = value_width * self.signature.measure.get() as f32;
         let full_size = Vec2::new(
             bar_width * self.bars as f32,
@@ -307,13 +319,144 @@ impl NoteEditor {
                 }
             }
         }
+
+        (response, painter)
+    }
+    pub fn show(&mut self, ui: &mut Ui, piano: &Piano) {
+        let (response, painter) = self.show_grid(ui, piano);
+        let dragged = response.dragged_by(PointerButton::Primary);
+        let clicked = response.clicked_by(PointerButton::Primary);
+
+        if let Some(pos) = response.hover_pos() {
+            let relative_pos = pos - response.rect.min;
+            let begin = if self.snapping {
+                let min_allowed = self.whole_note_width
+                    / (self.signature.value.get() * self.division.get()) as f32;
+                relative_pos.x - relative_pos.x % min_allowed
+            } else {
+                relative_pos.x
+            } / self.whole_note_width;
+            let current_note = Note {
+                begin,
+                end: begin + self.current_note_width,
+                key: (relative_pos.y / piano.key_height) as usize,
+            };
+
+            if response.clicked_by(PointerButton::Primary) {
+                self.notes.push(current_note);
+            } else {
+                if dragged && self.note_drag.is_none() {
+                    self.note_drag = Some(NoteDrag {
+                        end: true,
+                        index: None,
+                        note: current_note,
+                    });
+                    self.current_note_width = 0.0;
+                }
+                let mut note = if let Some(drag) = &mut self.note_drag {
+                    drag.note.end = drag.note.begin + self.current_note_width;
+                    drag.note.key = current_note.key;
+                    drag.note
+                } else {
+                    current_note
+                };
+                note.paint(
+                    &mut false,
+                    &mut true,
+                    &response,
+                    &painter,
+                    vec2(self.whole_note_width, piano.key_height),
+                    Rgba::from_white_alpha(GHOST_NOTE_ALPHA).into(),
+                );
+
+                if dragged {
+                    self.current_note_width = dbg!(note.end - note.begin);
+                    if self.snapping {
+                        let snap = (self.division.get() * self.signature.value.get()) as f32;
+                        self.current_note_width = (self.current_note_width * snap).round() / snap;
+                    }
+                } else if let Some(drag) = self.note_drag.take() {
+                    if let Some(i) = drag.index {
+                        self.notes[i] = drag.note;
+                    } else {
+                        self.notes.push(drag.note);
+                    }
+                }
+            }
+        }
+
+        for (i, note) in self.notes.iter().enumerate() {
+            let mut note1 = *note;
+            note1.paint(
+                &mut false,
+                &mut false,
+                &response,
+                &painter,
+                vec2(self.whole_note_width, piano.key_height),
+                Color32::WHITE,
+            );
+        }
     }
 }
 
+const NOTE_DRAG_DISTANCE: f32 = 5.0;
+
+#[derive(Copy, Clone)]
 pub struct Note {
-    pub begin: f32, // measured in seconds
+    pub begin: f32, // measured in notes (1.0 - one whole note)
     pub end: f32,
     pub key: usize,
+}
+
+impl Note {
+    fn paint(
+        &mut self,
+        begin_drag: &mut bool,
+        end_drag: &mut bool,
+        response: &Response,
+        painter: &Painter,
+        whole_note_size: Vec2,
+        color: Color32,
+    ) {
+        let draw_rect = Rect::from_min_size(
+            response.rect.min + vec2(self.begin, self.key as f32) * whole_note_size,
+            vec2(self.end - self.begin, 1.0) * whole_note_size,
+        );
+
+        if response.dragged_by(PointerButton::Primary)
+            && let Some(pos) = response.interact_pointer_pos()
+        {
+            let drag_bounding_size = Vec2::splat(NOTE_DRAG_DISTANCE);
+            if !*end_drag && !*begin_drag {
+                if Rect::from_min_max(
+                    pos2(draw_rect.max.x, draw_rect.min.y) - drag_bounding_size,
+                    draw_rect.max + drag_bounding_size,
+                )
+                .contains(pos)
+                {
+                    *end_drag = true;
+                } else if Rect::from_min_max(
+                    draw_rect.min - drag_bounding_size,
+                    pos2(draw_rect.min.x, draw_rect.max.y) + drag_bounding_size,
+                )
+                .contains(pos)
+                {
+                    *begin_drag = true;
+                }
+            }
+            let relative_pos = pos - response.rect.min;
+            if *end_drag {
+                self.end = (relative_pos.x / whole_note_size.x).max(self.begin);
+            } else if *begin_drag {
+                self.begin = (relative_pos.x / whole_note_size.x).min(self.end);
+            }
+        } else {
+            *begin_drag = false;
+            *end_drag = false;
+        }
+
+        painter.rect_filled(draw_rect, 0, color);
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -356,14 +499,10 @@ impl PianoRoll {
                 ui.horizontal(|ui| {
                     Grid::new("piano_roll_grid").show(ui, |ui| {
                         ui.label("Measure");
-                        ui.add(
-                            DragValue::new(&mut self.editor.signature.measure).range(1..=256),
-                        );
+                        ui.add(DragValue::new(&mut self.editor.signature.measure).range(1..=256));
                         ui.end_row();
                         ui.label("Value");
-                        ui.add(
-                            DragValue::new(&mut self.editor.signature.value).range(1..=256),
-                        );
+                        ui.add(DragValue::new(&mut self.editor.signature.value).range(1..=256));
                     });
                     ui.vertical(|ui| {
                         ui.label("Keyboard octave");
