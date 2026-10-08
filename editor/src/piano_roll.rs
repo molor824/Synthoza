@@ -58,10 +58,10 @@ const KEYBOARD_KEYS: [(Key, usize); 17 * 2] = [
 const KEYBOARD_MAX_OFFSET: usize = KEYBOARD_KEYS[KEYBOARD_KEYS.len() - 1].1;
 
 pub struct Piano {
-    kbd_octave: usize,
-    mouse_key: Option<usize>, // starting at C0 - 0, D0 - 1 etc...
-    kbd_keys: [bool; KEYBOARD_KEYS.len()], // Keyboard keys ordered, and represents its equivalent indexed notes.
-    key_height: f32,
+    pub kbd_octave: usize,
+    pub mouse_key: Option<usize>, // starting at C0 - 0, D0 - 1 etc...
+    pub kbd_keys: [bool; KEYBOARD_KEYS.len()], // Keyboard keys ordered, and represents its equivalent indexed notes.
+    pub key_height: f32,
 }
 impl Default for Piano {
     fn default() -> Self {
@@ -200,19 +200,19 @@ impl Piano {
 
 #[derive(Copy, Clone)]
 pub struct NoteDrag {
-    end: bool,
-    index: Option<usize>, // None for new note, Some for existing note
-    note: Note,
+    pub end: bool,
+    pub index: Option<usize>, // None for new note, Some for existing note
+    pub note: Note,
 }
 pub struct NoteEditor {
-    notes: Vec<Note>, // Must be ordered by Note::begin!!!
-    signature: TimeSignature,
-    bars: usize,
-    whole_note_width: f32, // Measured in whole note
-    division: NonZeroUsize,
-    snapping: bool,
-    current_note_width: f32,
-    note_drag: Option<NoteDrag>,
+    pub notes: Vec<Note>, // Must be ordered by Note::begin!!!
+    pub signature: TimeSignature,
+    pub bars: usize,
+    pub whole_note_width: f32, // Measured in whole note
+    pub division: NonZeroUsize,
+    pub snapping: bool,
+    pub current_note_duration: f32,
+    pub note_drag: Option<NoteDrag>,
 }
 impl Default for NoteEditor {
     fn default() -> Self {
@@ -223,7 +223,7 @@ impl Default for NoteEditor {
             whole_note_width: 200.0,
             snapping: true,
             division: NonZeroUsize::new(1).unwrap(),
-            current_note_width: 0.25, // quarter note by default (most common note probably)
+            current_note_duration: 0.25, // quarter note by default (most common note probably)
             note_drag: None,
         }
     }
@@ -327,9 +327,11 @@ impl NoteEditor {
         let dragged = response.dragged_by(PointerButton::Primary);
         let clicked = response.clicked_by(PointerButton::Primary);
 
-        if let Some(pos) = response.hover_pos() {
+        if self.note_drag.is_none_or(|drag| drag.index.is_none())
+            && let Some(pos) = response.hover_pos()
+        {
             let relative_pos = pos - response.rect.min;
-            let begin = if self.snapping {
+            let start = if self.snapping {
                 let min_allowed = self.whole_note_width
                     / (self.signature.value.get() * self.division.get()) as f32;
                 relative_pos.x - relative_pos.x % min_allowed
@@ -337,8 +339,8 @@ impl NoteEditor {
                 relative_pos.x
             } / self.whole_note_width;
             let current_note = Note {
-                begin,
-                end: begin + self.current_note_width,
+                start,
+                duration: self.current_note_duration,
                 key: (relative_pos.y / piano.key_height) as usize,
             };
 
@@ -351,10 +353,11 @@ impl NoteEditor {
                         index: None,
                         note: current_note,
                     });
-                    self.current_note_width = 0.0;
+                    self.current_note_duration = 0.0;
                 }
                 let mut note = if let Some(drag) = &mut self.note_drag {
-                    drag.note.end = drag.note.begin + self.current_note_width;
+                    assert!(drag.index.is_none(), "Existing note is being dragged, in this case this code shouldn't even run!");
+                    drag.note.duration = self.current_note_duration;
                     drag.note.key = current_note.key;
                     drag.note
                 } else {
@@ -370,10 +373,10 @@ impl NoteEditor {
                 );
 
                 if dragged {
-                    self.current_note_width = dbg!(note.end - note.begin);
+                    self.current_note_duration = note.duration;
                     if self.snapping {
                         let snap = (self.division.get() * self.signature.value.get()) as f32;
-                        self.current_note_width = (self.current_note_width * snap).round() / snap;
+                        self.current_note_duration = (self.current_note_duration * snap).round() / snap;
                     }
                 } else if let Some(drag) = self.note_drag.take() {
                     if let Some(i) = drag.index {
@@ -403,13 +406,16 @@ const NOTE_DRAG_DISTANCE: f32 = 5.0;
 
 #[derive(Copy, Clone)]
 pub struct Note {
-    pub begin: f32, // measured in notes (1.0 - one whole note)
-    pub end: f32,
+    pub start: f32, // measured in notes (1.0 - one whole note)
+    pub duration: f32,
     pub key: usize,
 }
 
 impl Note {
-    fn paint(
+    pub fn end(&self) -> f32 {
+        self.start + self.duration
+    }
+    pub fn paint(
         &mut self,
         begin_drag: &mut bool,
         end_drag: &mut bool,
@@ -419,8 +425,8 @@ impl Note {
         color: Color32,
     ) {
         let draw_rect = Rect::from_min_size(
-            response.rect.min + vec2(self.begin, self.key as f32) * whole_note_size,
-            vec2(self.end - self.begin, 1.0) * whole_note_size,
+            response.rect.min + vec2(self.start, self.key as f32) * whole_note_size,
+            vec2(self.duration, 1.0) * whole_note_size,
         );
 
         if response.dragged_by(PointerButton::Primary)
@@ -446,16 +452,18 @@ impl Note {
             }
             let relative_pos = pos - response.rect.min;
             if *end_drag {
-                self.end = (relative_pos.x / whole_note_size.x).max(self.begin);
+                self.duration = (relative_pos.x / whole_note_size.x - self.start).max(0.0);
             } else if *begin_drag {
-                self.begin = (relative_pos.x / whole_note_size.x).min(self.end);
+                let end = self.end();
+                self.start = (relative_pos.x / whole_note_size.x).min(end);
+                self.duration = end - self.start;
             }
         } else {
             *begin_drag = false;
             *end_drag = false;
         }
 
-        painter.rect_filled(draw_rect, 0, color);
+        painter.rect_filled(draw_rect, 5, color);
     }
 }
 
@@ -487,8 +495,8 @@ const COMMON_DIVS: [(usize, &str); 9] = [
 
 #[derive(Default)]
 pub struct PianoRoll {
-    piano: Piano,
-    editor: NoteEditor,
+    pub piano: Piano,
+    pub editor: NoteEditor,
 }
 
 impl PianoRoll {

@@ -5,7 +5,7 @@ use eframe::egui::{ScrollArea, Ui, ViewportBuilder};
 
 fn main() {
     let native_options = eframe::NativeOptions {
-        viewport: ViewportBuilder::default().with_maximized(true),
+        // viewport: ViewportBuilder::default().with_maximized(true),
         ..Default::default()
     };
     eframe::run_native(
