@@ -1,6 +1,5 @@
 use eframe::egui::*;
 use std::iter;
-use std::mem::{replace, swap};
 use std::num::NonZeroUsize;
 
 const WHITE_KEY: Rgba = Rgba::from_rgb(0.9, 0.9, 0.9);
@@ -459,9 +458,6 @@ pub struct Note {
 }
 
 impl Note {
-    pub const fn intersects(&self, other: &Note) -> bool {
-        self.end() >= other.start && self.start <= other.end()
-    }
     pub const fn from_end(start: f32, end: f32, key: usize) -> Self {
         assert!(start <= end, "start cannot be more than the end");
         Self {
