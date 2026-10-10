@@ -1,5 +1,6 @@
 use eframe::egui::*;
 use std::iter;
+use std::mem::{replace, swap};
 use std::num::NonZeroUsize;
 
 const WHITE_KEY: Rgba = Rgba::from_rgb(0.9, 0.9, 0.9);
@@ -198,12 +199,10 @@ impl Piano {
     }
 }
 
-#[derive(Copy, Clone)]
-pub struct NoteDrag {
-    pub end: bool,
-    pub index: Option<usize>, // None for new note, Some for existing note
-    pub note: Note,
+pub enum NoteDrag {
+    New { base: f32, end: f32, key: usize },
 }
+
 pub struct NoteEditor {
     pub notes: Vec<Note>, // Must be ordered by Note::begin!!!
     pub signature: TimeSignature,
@@ -213,6 +212,7 @@ pub struct NoteEditor {
     pub snapping: bool,
     pub current_note_duration: f32,
     pub note_drag: Option<NoteDrag>,
+    pub prev_click_state: bool,
 }
 impl Default for NoteEditor {
     fn default() -> Self {
@@ -222,9 +222,10 @@ impl Default for NoteEditor {
             bars: 4,
             whole_note_width: 200.0,
             snapping: true,
-            division: NonZeroUsize::new(1).unwrap(),
+            division: NonZeroUsize::new(4).unwrap(),
             current_note_duration: 0.25, // quarter note by default (most common note probably)
             note_drag: None,
+            prev_click_state: false,
         }
     }
 }
@@ -244,7 +245,9 @@ const SNAP_STROKE_ALPHA: f32 = 0.1;
 const WHITE_HIGHLIGHT_GRAY: f32 = 0.05;
 const BLACK_HIGHLIGHT_GRAY: f32 = 0.03;
 
-const GHOST_NOTE_ALPHA: f32 = 0.3;
+const GHOST_NOTE_COLOR: Color32 = Color32::from_rgba_unmultiplied_const(255, 255, 255, 100);
+
+const NOTE_MIN_DURATION: f32 = 0.001;
 
 impl NoteEditor {
     fn show_grid(&mut self, ui: &mut Ui, piano: &Piano) -> (Response, Painter) {
@@ -324,70 +327,16 @@ impl NoteEditor {
     }
     pub fn show(&mut self, ui: &mut Ui, piano: &Piano) {
         let (response, painter) = self.show_grid(ui, piano);
-        let dragged = response.dragged_by(PointerButton::Primary);
-        let clicked = response.clicked_by(PointerButton::Primary);
+        let clicking = response.is_pointer_button_down_on()
+            && response
+                .ctx
+                .input(|i| i.pointer.button_down(PointerButton::Primary));
+        let snap = (self.signature.value.get() * self.division.get()) as f32;
+        let just_clicked = !self.prev_click_state && clicking;
+        let just_released = self.prev_click_state && !clicking;
+        self.prev_click_state = clicking;
 
-        if self.note_drag.is_none_or(|drag| drag.index.is_none())
-            && let Some(pos) = response.hover_pos()
-        {
-            let relative_pos = pos - response.rect.min;
-            let start = if self.snapping {
-                let min_allowed = self.whole_note_width
-                    / (self.signature.value.get() * self.division.get()) as f32;
-                relative_pos.x - relative_pos.x % min_allowed
-            } else {
-                relative_pos.x
-            } / self.whole_note_width;
-            let current_note = Note {
-                start,
-                duration: self.current_note_duration,
-                key: (relative_pos.y / piano.key_height) as usize,
-            };
-
-            if response.clicked_by(PointerButton::Primary) {
-                self.notes.push(current_note);
-            } else {
-                if dragged && self.note_drag.is_none() {
-                    self.note_drag = Some(NoteDrag {
-                        end: true,
-                        index: None,
-                        note: current_note,
-                    });
-                    self.current_note_duration = 0.0;
-                }
-                let mut note = if let Some(drag) = &mut self.note_drag {
-                    assert!(drag.index.is_none(), "Existing note is being dragged, in this case this code shouldn't even run!");
-                    drag.note.duration = self.current_note_duration;
-                    drag.note.key = current_note.key;
-                    drag.note
-                } else {
-                    current_note
-                };
-                note.paint(
-                    &mut false,
-                    &mut true,
-                    &response,
-                    &painter,
-                    vec2(self.whole_note_width, piano.key_height),
-                    Rgba::from_white_alpha(GHOST_NOTE_ALPHA).into(),
-                );
-
-                if dragged {
-                    self.current_note_duration = note.duration;
-                    if self.snapping {
-                        let snap = (self.division.get() * self.signature.value.get()) as f32;
-                        self.current_note_duration = (self.current_note_duration * snap).round() / snap;
-                    }
-                } else if let Some(drag) = self.note_drag.take() {
-                    if let Some(i) = drag.index {
-                        self.notes[i] = drag.note;
-                    } else {
-                        self.notes.push(drag.note);
-                    }
-                }
-            }
-        }
-
+        let notes_len = self.notes.len();
         for (i, note) in self.notes.iter().enumerate() {
             let mut note1 = *note;
             note1.paint(
@@ -396,15 +345,113 @@ impl NoteEditor {
                 &response,
                 &painter,
                 vec2(self.whole_note_width, piano.key_height),
-                Color32::WHITE,
+                Rgba::from_white_alpha((i + 1) as f32 / notes_len as f32).into(),
             );
         }
+
+        if let Some(pos) = response.hover_pos() {
+            let relative_pos = pos - response.rect.min;
+            let note_pos = relative_pos.x / self.whole_note_width;
+            let start = if self.snapping {
+                (note_pos * snap).round() / snap
+            } else {
+                note_pos
+            };
+            let note = Note {
+                start,
+                duration: self.current_note_duration,
+                key: (relative_pos.y / piano.key_height) as usize,
+            };
+
+            if just_released {
+                let drag = self.note_drag.take();
+                self.add_note(match drag {
+                    Some(NoteDrag::New { base, end, key })
+                        if (base - end).abs() > NOTE_MIN_DURATION =>
+                    {
+                        Note::from_points(base, end, key)
+                    }
+                    _ => note,
+                });
+            } else {
+                let mut note = note;
+                if just_clicked {
+                    self.note_drag = Some(NoteDrag::New {
+                        base: start,
+                        end: start,
+                        key: note.key,
+                    });
+                }
+
+                if let Some(drag) = self.note_drag.as_mut() {
+                    match drag {
+                        NoteDrag::New { end, base, key } => {
+                            *end = if self.snapping {
+                                (note_pos * snap).round() / snap
+                            } else {
+                                note_pos
+                            };
+                            if (*base - *end).abs() > NOTE_MIN_DURATION {
+                                note = Note::from_points(*base, *end, *key);
+                            }
+                            note.key = *key;
+                        }
+                    }
+                }
+
+                note.paint(
+                    &mut false,
+                    &mut false,
+                    &response,
+                    &painter,
+                    vec2(self.whole_note_width, piano.key_height),
+                    GHOST_NOTE_COLOR,
+                );
+            }
+        }
+    }
+    fn add_note(&mut self, new_note: Note) {
+        if new_note.duration <= NOTE_MIN_DURATION {
+            return;
+        }
+        let mut idx = 0;
+        while idx < self.notes.len() {
+            let note = self.notes[idx];
+            if note.end() < new_note.start {
+                idx += 1;
+                continue;
+            } else if note.start > new_note.end() { // insert
+                self.notes.insert(idx, new_note);
+                return; // not worth going any further
+            }
+            let (left, right) = note.overlap_other(&new_note);
+
+            if let Some(r) = right {
+                // everything past is already past the new note, return from this point on
+                if let Some(l) = left {
+                    // everything exists, replace all at once
+                    self.notes.splice(idx..=idx, [l, new_note, r]);
+                } else {
+                    self.notes.splice(idx..=idx, [new_note, r]);
+                }
+                return; // anything past is not worth computing
+            }
+            if let Some(l) = left { // no right, but left
+                self.notes[idx] = l;
+                idx += 1;
+            } else { // nothing, remove the note entirely
+                self.notes.remove(idx);
+            }
+        }
+        // if you reached this, then it was always left and no right overlapping note occured
+        // thus making new_note the last one
+        self.notes.push(new_note);
     }
 }
 
 const NOTE_DRAG_DISTANCE: f32 = 5.0;
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Note {
     pub start: f32, // measured in notes (1.0 - one whole note)
     pub duration: f32,
@@ -412,7 +459,43 @@ pub struct Note {
 }
 
 impl Note {
-    pub fn end(&self) -> f32 {
+    pub const fn intersects(&self, other: &Note) -> bool {
+        self.end() >= other.start && self.start <= other.end()
+    }
+    pub const fn from_end(start: f32, end: f32, key: usize) -> Self {
+        assert!(start <= end, "start cannot be more than the end");
+        Self {
+            start,
+            key,
+            duration: end - start,
+        }
+    }
+    pub const fn from_points(a: f32, b: f32, key: usize) -> Self {
+        Self::from_end(a.min(b), a.max(b), key)
+    }
+    pub fn overlap_other(&self, other: &Note) -> (Option<Note>, Option<Note>) {
+        (
+            if self.start < other.start {
+                Some(Note::from_end(
+                    self.start,
+                    self.end().min(other.start),
+                    self.key,
+                ))
+            } else {
+                None
+            },
+            if self.end() > other.end() {
+                Some(Note::from_end(
+                    self.start.max(other.end()),
+                    self.end(),
+                    self.key,
+                ))
+            } else {
+                None
+            },
+        )
+    }
+    pub const fn end(&self) -> f32 {
         self.start + self.duration
     }
     pub fn paint(
