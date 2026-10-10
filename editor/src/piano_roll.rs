@@ -364,14 +364,16 @@ impl NoteEditor {
 
             if just_released {
                 let drag = self.note_drag.take();
-                self.add_note(match drag {
+                let note = match drag {
                     Some(NoteDrag::New { base, end, key })
                         if (base - end).abs() > NOTE_MIN_DURATION =>
                     {
+                        self.current_note_duration = (base - end).abs();
                         Note::from_points(base, end, key)
                     }
                     _ => note,
-                });
+                };
+                self.add_note(note);
             } else {
                 let mut note = note;
                 if just_clicked {
