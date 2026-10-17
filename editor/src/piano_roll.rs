@@ -340,7 +340,6 @@ impl NoteEditor {
             let mut note1 = *note;
             note1.paint(
                 &mut false,
-                &mut false,
                 &response,
                 &painter,
                 vec2(self.whole_note_width, piano.key_height),
@@ -352,7 +351,7 @@ impl NoteEditor {
             let relative_pos = pos - response.rect.min;
             let note_pos = relative_pos.x / self.whole_note_width;
             let start = if self.snapping {
-                (note_pos * snap).round() / snap
+                (note_pos * snap).floor() / snap
             } else {
                 note_pos
             };
@@ -365,11 +364,16 @@ impl NoteEditor {
             if just_released {
                 let drag = self.note_drag.take();
                 let note = match drag {
-                    Some(NoteDrag::New { base, end, key })
-                        if (base - end).abs() > NOTE_MIN_DURATION =>
-                    {
+                    Some(NoteDrag::New { base, end, key }) => {
                         self.current_note_duration = (base - end).abs();
-                        Note::from_points(base, end, key)
+                        if self.current_note_duration <= NOTE_MIN_DURATION {
+                            self.current_note_duration = note.duration;
+                        }
+                        Note {
+                            start: base.min(end),
+                            duration: self.current_note_duration,
+                            key,
+                        }
                     }
                     _ => note,
                 };
@@ -387,11 +391,7 @@ impl NoteEditor {
                 if let Some(drag) = self.note_drag.as_mut() {
                     match drag {
                         NoteDrag::New { end, base, key } => {
-                            *end = if self.snapping {
-                                (note_pos * snap).round() / snap
-                            } else {
-                                note_pos
-                            };
+                            *end = start;
                             if (*base - *end).abs() > NOTE_MIN_DURATION {
                                 note = Note::from_points(*base, *end, *key);
                             }
@@ -401,7 +401,6 @@ impl NoteEditor {
                 }
 
                 note.paint(
-                    &mut false,
                     &mut false,
                     &response,
                     &painter,
@@ -415,44 +414,36 @@ impl NoteEditor {
         if new_note.duration <= NOTE_MIN_DURATION {
             return;
         }
+
         let mut idx = 0;
         while idx < self.notes.len() {
             let note = self.notes[idx];
-            if note.end() < new_note.start {
+            let Some((left, right)) = note.overlap_other(&new_note) else {
                 idx += 1;
                 continue;
-            } else if note.start > new_note.end() { // insert
-                self.notes.insert(idx, new_note);
-                return; // not worth going any further
-            }
-            let (left, right) = note.overlap_other(&new_note);
-
-            if let Some(r) = right {
-                // everything past is already past the new note, return from this point on
-                if let Some(l) = left {
-                    // everything exists, replace all at once
-                    self.notes.splice(idx..=idx, [l, new_note, r]);
-                } else {
-                    self.notes.splice(idx..=idx, [new_note, r]);
-                }
-                return; // anything past is not worth computing
-            }
-            if let Some(l) = left { // no right, but left
+            };
+            if let Some(l) = left {
                 self.notes[idx] = l;
                 idx += 1;
-            } else { // nothing, remove the note entirely
+                if let Some(r) = right {
+                    self.notes.insert(idx, r);
+                    idx += 1;
+                }
+            } else if let Some(r) = right {
+                self.notes[idx] = r;
+                idx += 1;
+            } else {
                 self.notes.remove(idx);
             }
         }
-        // if you reached this, then it was always left and no right overlapping note occured
-        // thus making new_note the last one
+
         self.notes.push(new_note);
     }
 }
 
 const NOTE_DRAG_DISTANCE: f32 = 5.0;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Note {
     pub start: f32, // measured in notes (1.0 - one whole note)
     pub duration: f32,
@@ -471,35 +462,38 @@ impl Note {
     pub const fn from_points(a: f32, b: f32, key: usize) -> Self {
         Self::from_end(a.min(b), a.max(b), key)
     }
-    pub fn overlap_other(&self, other: &Note) -> (Option<Note>, Option<Note>) {
-        (
-            if self.start < other.start {
-                Some(Note::from_end(
-                    self.start,
-                    self.end().min(other.start),
-                    self.key,
-                ))
-            } else {
-                None
-            },
-            if self.end() > other.end() {
-                Some(Note::from_end(
-                    self.start.max(other.end()),
-                    self.end(),
-                    self.key,
-                ))
-            } else {
-                None
-            },
-        )
+    pub fn overlap_other(&self, other: &Note) -> Option<(Option<Note>, Option<Note>)> {
+        if self.key != other.key {
+            None
+        } else {
+            Some((
+                if self.start < other.start {
+                    Some(Note::from_end(
+                        self.start,
+                        self.end().min(other.start),
+                        self.key,
+                    ))
+                } else {
+                    None
+                },
+                if self.end() > other.end() {
+                    Some(Note::from_end(
+                        self.start.max(other.end()),
+                        self.end(),
+                        self.key,
+                    ))
+                } else {
+                    None
+                },
+            ))
+        }
     }
     pub const fn end(&self) -> f32 {
         self.start + self.duration
     }
     pub fn paint(
         &mut self,
-        begin_drag: &mut bool,
-        end_drag: &mut bool,
+        drag: &mut bool,
         response: &Response,
         painter: &Painter,
         whole_note_size: Vec2,
@@ -514,34 +508,22 @@ impl Note {
             && let Some(pos) = response.interact_pointer_pos()
         {
             let drag_bounding_size = Vec2::splat(NOTE_DRAG_DISTANCE);
-            if !*end_drag && !*begin_drag {
+            if !*drag {
                 if Rect::from_min_max(
                     pos2(draw_rect.max.x, draw_rect.min.y) - drag_bounding_size,
                     draw_rect.max + drag_bounding_size,
                 )
                 .contains(pos)
                 {
-                    *end_drag = true;
-                } else if Rect::from_min_max(
-                    draw_rect.min - drag_bounding_size,
-                    pos2(draw_rect.min.x, draw_rect.max.y) + drag_bounding_size,
-                )
-                .contains(pos)
-                {
-                    *begin_drag = true;
+                    *drag = true;
                 }
             }
             let relative_pos = pos - response.rect.min;
-            if *end_drag {
+            if *drag {
                 self.duration = (relative_pos.x / whole_note_size.x - self.start).max(0.0);
-            } else if *begin_drag {
-                let end = self.end();
-                self.start = (relative_pos.x / whole_note_size.x).min(end);
-                self.duration = end - self.start;
             }
         } else {
-            *begin_drag = false;
-            *end_drag = false;
+            *drag = false;
         }
 
         painter.rect_filled(draw_rect, 5, color);
