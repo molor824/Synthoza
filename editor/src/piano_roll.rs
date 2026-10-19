@@ -200,6 +200,7 @@ impl Piano {
 
 pub enum NoteDrag {
     New { base: f32, end: f32, key: usize },
+    Resizing { index: usize, note: Note },
 }
 
 pub struct NoteEditor {
@@ -211,7 +212,6 @@ pub struct NoteEditor {
     pub snapping: bool,
     pub current_note_duration: f32,
     pub note_drag: Option<NoteDrag>,
-    pub prev_click_state: bool,
 }
 impl Default for NoteEditor {
     fn default() -> Self {
@@ -224,7 +224,6 @@ impl Default for NoteEditor {
             division: NonZeroUsize::new(4).unwrap(),
             current_note_duration: 0.25, // quarter note by default (most common note probably)
             note_drag: None,
-            prev_click_state: false,
         }
     }
 }
@@ -326,28 +325,63 @@ impl NoteEditor {
     }
     pub fn show(&mut self, ui: &mut Ui, piano: &Piano) {
         let (response, painter) = self.show_grid(ui, piano);
-        let clicking = response.is_pointer_button_down_on()
-            && response
-                .ctx
-                .input(|i| i.pointer.button_down(PointerButton::Primary));
         let snap = (self.signature.value.get() * self.division.get()) as f32;
-        let just_clicked = !self.prev_click_state && clicking;
-        let just_released = self.prev_click_state && !clicking;
-        self.prev_click_state = clicking;
+        let (just_pressed, just_released) = response.ctx.input(|i| {
+            (
+                i.pointer.button_pressed(PointerButton::Primary),
+                i.pointer.button_released(PointerButton::Primary),
+            )
+        });
 
-        let notes_len = self.notes.len();
-        for (i, note) in self.notes.iter().enumerate() {
-            let mut note1 = *note;
-            note1.paint(
-                &mut false,
-                &response,
-                &painter,
-                vec2(self.whole_note_width, piano.key_height),
-                Rgba::from_white_alpha((i + 1) as f32 / notes_len as f32).into(),
-            );
+        let mut hovering = false;
+        let mut skip_new_note = false;
+
+        {
+            let mut i = 0;
+            while i < self.notes.len() {
+                let (mut note, resizing) = match self.note_drag {
+                    Some(NoteDrag::Resizing { index, note }) if index == i => (note, true),
+                    _ => (self.notes[i], false),
+                };
+                let mut resizing1 = resizing;
+                note.paint(
+                    &mut resizing1,
+                    &mut hovering,
+                    &response,
+                    &painter,
+                    just_pressed,
+                    just_released,
+                    vec2(self.whole_note_width, piano.key_height),
+                    Color32::WHITE,
+                );
+
+                if resizing || resizing1 {
+                    if self.snapping {
+                        let division = (self.signature.value.get() * self.division.get()) as f32;
+                        note.duration = (note.duration * division).round() / division;
+                    }
+                    skip_new_note = true;
+                    self.note_drag = if resizing1 {
+                        Some(NoteDrag::Resizing { index: i, note })
+                    } else {
+                        None
+                    };
+                    if !resizing1 {
+                        self.update_note(i, note);
+                    }
+                }
+                i += 1;
+            }
         }
 
-        if let Some(pos) = response.hover_pos() {
+        if hovering {
+            painter
+                .ctx()
+                .output_mut(|output| output.cursor_icon = CursorIcon::ResizeHorizontal);
+        } else if !skip_new_note
+            && matches!(self.note_drag, None | Some(NoteDrag::New { .. }))
+            && let Some(pos) = response.hover_pos()
+        {
             let relative_pos = pos - response.rect.min;
             let note_pos = relative_pos.x / self.whole_note_width;
             let start = if self.snapping {
@@ -355,7 +389,7 @@ impl NoteEditor {
             } else {
                 note_pos
             };
-            let note = Note {
+            let mut note = Note {
                 start,
                 duration: self.current_note_duration,
                 key: (relative_pos.y / piano.key_height) as usize,
@@ -363,62 +397,78 @@ impl NoteEditor {
 
             if just_released {
                 let drag = self.note_drag.take();
-                let note = match drag {
+                match drag {
                     Some(NoteDrag::New { base, end, key }) => {
                         self.current_note_duration = (base - end).abs();
-                        if self.current_note_duration <= NOTE_MIN_DURATION {
+                        if self.current_note_duration < NOTE_MIN_DURATION {
                             self.current_note_duration = note.duration;
                         }
-                        Note {
+                        self.add_note(Note {
                             start: base.min(end),
                             duration: self.current_note_duration,
                             key,
-                        }
+                        });
                     }
-                    _ => note,
-                };
-                self.add_note(note);
-            } else {
-                let mut note = note;
-                if just_clicked {
-                    self.note_drag = Some(NoteDrag::New {
-                        base: start,
-                        end: start,
-                        key: note.key,
-                    });
+                    _ => self.add_note(note),
                 }
-
-                if let Some(drag) = self.note_drag.as_mut() {
-                    match drag {
-                        NoteDrag::New { end, base, key } => {
-                            *end = start;
-                            if (*base - *end).abs() > NOTE_MIN_DURATION {
-                                note = Note::from_points(*base, *end, *key);
-                            }
-                            note.key = *key;
-                        }
-                    }
-                }
-
-                note.paint(
-                    &mut false,
-                    &response,
-                    &painter,
-                    vec2(self.whole_note_width, piano.key_height),
-                    GHOST_NOTE_COLOR,
-                );
             }
+
+            if just_pressed {
+                self.note_drag = Some(NoteDrag::New {
+                    base: start,
+                    end: start,
+                    key: note.key,
+                });
+            }
+
+            if let Some(drag) = self.note_drag.as_mut() {
+                match drag {
+                    NoteDrag::New { end, base, key } => {
+                        *end = start;
+                        if (*base - *end).abs() >= NOTE_MIN_DURATION {
+                            note = Note::from_points(*base, *end, *key);
+                        }
+                        note.key = *key;
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            painter.rect_filled(
+                note.draw_rect(
+                    response.rect.min,
+                    vec2(self.whole_note_width, piano.key_height),
+                ),
+                NOTE_CORNER_RADIUS,
+                GHOST_NOTE_COLOR,
+            );
         }
     }
-    fn add_note(&mut self, new_note: Note) {
-        if new_note.duration <= NOTE_MIN_DURATION {
+    fn update_note(&mut self, index: usize, new_note: Note) {
+        if new_note.duration < NOTE_MIN_DURATION {
+            self.notes.remove(index);
             return;
         }
 
+        self.notes[index] = new_note;
+        self.fix_overlap(index);
+    }
+    fn add_note(&mut self, new_note: Note) {
+        if new_note.duration < NOTE_MIN_DURATION {
+            return;
+        }
+
+        self.notes.push(new_note);
+        self.fix_overlap(self.notes.len() - 1);
+    }
+    fn fix_overlap(&mut self, mut index: usize) {
+        let main_note = self.notes[index];
         let mut idx = 0;
         while idx < self.notes.len() {
-            let note = self.notes[idx];
-            let Some((left, right)) = note.overlap_other(&new_note) else {
+            if idx == index {
+                idx += 1;
+                continue;
+            }
+            let Some((left, right)) = self.notes[idx].overlap_other(&main_note) else {
                 idx += 1;
                 continue;
             };
@@ -426,22 +476,27 @@ impl NoteEditor {
                 self.notes[idx] = l;
                 idx += 1;
                 if let Some(r) = right {
-                    self.notes.insert(idx, r);
+                    self.notes.insert(idx, r); // inserting can throw off the index number of the main note
+                    if index >= idx {
+                        index += 1;
+                    }
                     idx += 1;
                 }
             } else if let Some(r) = right {
                 self.notes[idx] = r;
                 idx += 1;
             } else {
-                self.notes.remove(idx);
+                self.notes.remove(idx); // removing can also shift index
+                if index >= idx {
+                    index -= 1;
+                }
             }
         }
-
-        self.notes.push(new_note);
     }
 }
 
-const NOTE_DRAG_DISTANCE: f32 = 5.0;
+const NOTE_RESIZE_RECT_WIDTH: f32 = 5.0;
+const NOTE_CORNER_RADIUS: f32 = 5.0;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Note {
@@ -491,42 +546,48 @@ impl Note {
     pub const fn end(&self) -> f32 {
         self.start + self.duration
     }
+    pub fn draw_rect(&self, min: Pos2, whole_note_size: Vec2) -> Rect {
+        Rect::from_min_size(
+            min + vec2(self.start, self.key as f32) * whole_note_size,
+            vec2(self.duration, 1.0) * whole_note_size,
+        )
+    }
     pub fn paint(
         &mut self,
-        drag: &mut bool,
+        resizing: &mut bool,
+        resize_hovering: &mut bool,
         response: &Response,
         painter: &Painter,
+        just_pressed: bool,
+        just_released: bool,
         whole_note_size: Vec2,
         color: Color32,
     ) {
-        let draw_rect = Rect::from_min_size(
-            response.rect.min + vec2(self.start, self.key as f32) * whole_note_size,
-            vec2(self.duration, 1.0) * whole_note_size,
-        );
+        let draw_rect = self.draw_rect(response.rect.min, whole_note_size);
 
-        if response.dragged_by(PointerButton::Primary)
-            && let Some(pos) = response.interact_pointer_pos()
-        {
-            let drag_bounding_size = Vec2::splat(NOTE_DRAG_DISTANCE);
-            if !*drag {
-                if Rect::from_min_max(
-                    pos2(draw_rect.max.x, draw_rect.min.y) - drag_bounding_size,
-                    draw_rect.max + drag_bounding_size,
-                )
-                .contains(pos)
-                {
-                    *drag = true;
+        if let Some(pos) = response.hover_pos() {
+            let drag_bounding_size = Vec2::new(NOTE_RESIZE_RECT_WIDTH, 0.0);
+            let drag_rect = Rect::from_min_max(
+                pos2(draw_rect.max.x, draw_rect.min.y) - drag_bounding_size,
+                draw_rect.max,
+            );
+            if drag_rect.contains(pos) {
+                *resize_hovering = true;
+                if just_pressed {
+                    *resizing = true;
                 }
             }
-            let relative_pos = pos - response.rect.min;
-            if *drag {
-                self.duration = (relative_pos.x / whole_note_size.x - self.start).max(0.0);
+            if just_released {
+                *resizing = false;
             }
-        } else {
-            *drag = false;
+            if *resizing {
+                let relative_pos = pos - response.rect.min;
+                self.duration = (relative_pos.x / whole_note_size.x - self.start).max(0.0);
+                *resize_hovering = true;
+            }
         }
 
-        painter.rect_filled(draw_rect, 5, color);
+        painter.rect_filled(draw_rect, NOTE_CORNER_RADIUS, color);
     }
 }
 
