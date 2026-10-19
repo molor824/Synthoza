@@ -161,22 +161,22 @@ impl Piano {
     }
 
     fn white_rects(&self) -> [Rect; 7] {
-        let heights = [1.5, 2.0, 2.0, 1.5, 1.5, 2.0, 1.5];
+        const HEIGHTS: [f32; 7] = [1.5, 2.0, 2.0, 1.5, 1.5, 2.0, 1.5];
         let mut pos = Pos2::ZERO;
 
         std::array::from_fn(|idx| {
-            let size = Vec2::new(KEY_WIDTH, heights[idx] * self.key_height);
+            let size = Vec2::new(KEY_WIDTH, HEIGHTS[idx] * self.key_height);
             let rect = Rect::from_min_size(pos, size);
             pos.y += size.y;
             rect
         })
     }
     fn black_rects(&self) -> [Rect; 5] {
-        let positions = [1.0, 3.0, 5.0, 8.0, 10.0];
+        const POSITIONS: [f32; 5] = [1.0, 3.0, 5.0, 8.0, 10.0];
 
         std::array::from_fn(|idx| {
             Rect::from_min_size(
-                Pos2::new(0.0, self.key_height * positions[idx]),
+                Pos2::new(0.0, self.key_height * POSITIONS[idx]),
                 Vec2::new(BLACK_KEY_WIDTH, self.key_height),
             )
         })
