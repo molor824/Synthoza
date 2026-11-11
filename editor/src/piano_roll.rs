@@ -200,7 +200,7 @@ impl Piano {
 
 pub enum NoteDrag {
     New { base: f32, end: f32, key: usize },
-    Resizing { index: usize, note: Note },
+    Existing { index: usize, note: NoteUi },
 }
 
 pub struct NoteEditor {
@@ -323,6 +323,16 @@ impl NoteEditor {
 
         (response, painter)
     }
+    pub fn whole_note_size(&self, piano: &Piano) -> Vec2 {
+        vec2(self.whole_note_width, piano.key_height)
+    }
+    pub fn snap_division(&self) -> usize {
+        if self.snapping {
+            self.signature.value.get() * self.division.get()
+        } else {
+            0
+        }
+    }
     pub fn show(&mut self, ui: &mut Ui, piano: &Piano) {
         let (response, painter) = self.show_grid(ui, piano);
         let snap = (self.signature.value.get() * self.division.get()) as f32;
@@ -332,53 +342,41 @@ impl NoteEditor {
                 i.pointer.button_released(PointerButton::Primary),
             )
         });
-
-        let mut hovering = false;
+        let whole_note_size = self.whole_note_size(piano);
         let mut skip_new_note = false;
 
         {
             let mut i = 0;
             while i < self.notes.len() {
-                let (mut note, resizing) = match self.note_drag {
-                    Some(NoteDrag::Resizing { index, note }) if index == i => (note, true),
-                    _ => (self.notes[i], false),
+                let mut note_ui = match self.note_drag {
+                    Some(NoteDrag::Existing { index, note }) if index == i => note,
+                    _ => NoteUi::with_note(self.notes[i]),
                 };
-                let mut resizing1 = resizing;
-                note.paint(
-                    &mut resizing1,
-                    &mut hovering,
+                let prev_ui = note_ui;
+                note_ui.show(
                     &response,
                     &painter,
-                    just_pressed,
-                    just_released,
-                    vec2(self.whole_note_width, piano.key_height),
+                    whole_note_size,
                     Color32::WHITE,
+                    self.snap_division(),
                 );
 
-                if resizing || resizing1 {
-                    if self.snapping {
-                        let division = (self.signature.value.get() * self.division.get()) as f32;
-                        note.duration = (note.duration * division).round() / division;
-                    }
-                    skip_new_note = true;
-                    self.note_drag = if resizing1 {
-                        Some(NoteDrag::Resizing { index: i, note })
-                    } else {
-                        None
-                    };
-                    if !resizing1 {
-                        self.update_note(i, note);
-                    }
+                if note_ui.resizing {
+                    self.note_drag = Some(NoteDrag::Existing {
+                        index: i,
+                        note: note_ui,
+                    });
+                } else if prev_ui.resizing {
+                    self.update_note(i, note_ui.note);
+                    self.note_drag = None;
                 }
+
+                skip_new_note = skip_new_note || prev_ui.resizing || note_ui.resizing;
                 i += 1;
             }
         }
 
-        if hovering {
-            painter
-                .ctx()
-                .output_mut(|output| output.cursor_icon = CursorIcon::ResizeHorizontal);
-        } else if !skip_new_note
+        if !skip_new_note
             && matches!(self.note_drag, None | Some(NoteDrag::New { .. }))
             && let Some(pos) = response.hover_pos()
         {
@@ -409,7 +407,7 @@ impl NoteEditor {
                             key,
                         });
                     }
-                    _ => self.add_note(note),
+                    _ => {}
                 }
             }
 
@@ -433,12 +431,11 @@ impl NoteEditor {
                     _ => unreachable!(),
                 }
             }
-            painter.rect_filled(
-                note.draw_rect(
-                    response.rect.min,
-                    vec2(self.whole_note_width, piano.key_height),
-                ),
-                NOTE_CORNER_RADIUS,
+
+            note.paint(
+                &response,
+                &painter,
+                vec2(self.whole_note_width, piano.key_height),
                 GHOST_NOTE_COLOR,
             );
         }
@@ -498,6 +495,67 @@ impl NoteEditor {
 const NOTE_RESIZE_RECT_WIDTH: f32 = 5.0;
 const NOTE_CORNER_RADIUS: f32 = 5.0;
 
+#[derive(Debug, Clone, Copy)]
+pub struct NoteUi {
+    pub note: Note,
+    pub resizing: bool,
+    pub resize_hovering: bool,
+}
+impl NoteUi {
+    pub const fn with_note(note: Note) -> Self {
+        Self {
+            note,
+            resize_hovering: false,
+            resizing: false,
+        }
+    }
+    pub fn show(
+        &mut self,
+        response: &Response,
+        painter: &Painter,
+        whole_note_size: Vec2,
+        color: Color32,
+        snap_divs: usize,
+    ) {
+        let (just_clicked, just_released) = response.ctx.input(|i| {
+            (
+                i.pointer.button_pressed(PointerButton::Primary),
+                i.pointer.button_released(PointerButton::Primary),
+            )
+        });
+        let rect = self.note.paint(response, painter, whole_note_size, color);
+
+        if let Some(pos) = response.hover_pos() {
+            let drag_bounding_size = Vec2::new(NOTE_RESIZE_RECT_WIDTH, 0.0);
+            let drag_rect =
+                Rect::from_min_max(pos2(rect.max.x, rect.min.y) - drag_bounding_size, rect.max);
+
+            self.resize_hovering = drag_rect.contains(pos);
+
+            if self.resize_hovering && just_clicked {
+                self.resizing = true;
+            }
+            if just_released {
+                self.resizing = false;
+            }
+            if self.resizing {
+                let relative_pos = pos - response.rect.min;
+                self.note.duration =
+                    (relative_pos.x / whole_note_size.x - self.note.start).max(0.0);
+                if snap_divs != 0 {
+                    let divs = snap_divs as f32;
+                    self.note.duration = (self.note.duration * divs).round() / divs;
+                }
+            }
+            if self.resize_hovering || self.resizing {
+                response
+                    .ctx
+                    .output_mut(|o| o.cursor_icon = CursorIcon::ResizeHorizontal);
+            }
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Note {
     pub start: f32, // measured in notes (1.0 - one whole note)
@@ -553,41 +611,15 @@ impl Note {
         )
     }
     pub fn paint(
-        &mut self,
-        resizing: &mut bool,
-        resize_hovering: &mut bool,
+        &self,
         response: &Response,
         painter: &Painter,
-        just_pressed: bool,
-        just_released: bool,
         whole_note_size: Vec2,
         color: Color32,
-    ) {
-        let draw_rect = self.draw_rect(response.rect.min, whole_note_size);
-
-        if let Some(pos) = response.hover_pos() {
-            let drag_bounding_size = Vec2::new(NOTE_RESIZE_RECT_WIDTH, 0.0);
-            let drag_rect = Rect::from_min_max(
-                pos2(draw_rect.max.x, draw_rect.min.y) - drag_bounding_size,
-                draw_rect.max,
-            );
-            if drag_rect.contains(pos) {
-                *resize_hovering = true;
-                if just_pressed {
-                    *resizing = true;
-                }
-            }
-            if just_released {
-                *resizing = false;
-            }
-            if *resizing {
-                let relative_pos = pos - response.rect.min;
-                self.duration = (relative_pos.x / whole_note_size.x - self.start).max(0.0);
-                *resize_hovering = true;
-            }
-        }
-
-        painter.rect_filled(draw_rect, NOTE_CORNER_RADIUS, color);
+    ) -> Rect {
+        let rect = self.draw_rect(response.rect.min, whole_note_size);
+        painter.rect_filled(rect, NOTE_CORNER_RADIUS, color);
+        rect
     }
 }
 
