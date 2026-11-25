@@ -1,157 +1,189 @@
-#[cfg(test)]
-mod tests {
-    use core::f32;
-    use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-    use mlua::prelude::*;
-    use rtrb::RingBuffer;
-    use std::{thread, time::Duration};
+use nice_plug::{
+    formatters::{
+        s2v_f32_gain_to_db, s2v_f32_hz_then_khz, v2s_f32_gain_to_db, v2s_f32_hz_then_khz,
+    },
+    midi::Key,
+    prelude::*,
+    util::{db_to_gain, db_to_gain_fast, midi_key_to_freq},
+};
+use std::{f32::consts, sync::Arc};
 
-    #[test]
-    fn test_cpal() {
-        let host = cpal::default_host();
-        let device = host.default_output_device().unwrap();
+pub struct MyPlugin {
+    params: Arc<MyPluginParams>,
+    sample_rate: f32,
+    phase: f32,
+    midi_key_num: u8,
+    midi_note_freq: f32,
+    midi_note_gain: Smoother<f32>,
+}
 
-        let config = device.default_output_config().unwrap();
-        let sample_rate = config.sample_rate() as f32;
-        let channels = config.channels() as usize;
-
-        let mut phase = 0.0 as f32;
-        let freq = 440.0;
-        let amplitude = 0.3;
-
-        let stream = device
-            .build_output_stream(
-                &config.into(),
-                move |data: &mut [f32], _| {
-                    for frame in data.chunks_mut(channels) {
-                        let sample = (phase * f32::consts::TAU).sin() * amplitude;
-
-                        phase = (phase + freq / sample_rate) % 1.0;
-
-                        for channel in frame.iter_mut() {
-                            *channel = sample;
-                        }
-                    }
+#[derive(Params)]
+struct MyPluginParams {
+    #[id = "gain"]
+    pub gain: FloatParam,
+    #[id = "freq"]
+    pub frequency: FloatParam,
+    #[id = "usemid"]
+    pub use_midi: BoolParam,
+}
+impl Default for MyPluginParams {
+    fn default() -> Self {
+        Self {
+            gain: FloatParam::new("Gain", db_to_gain(0.0), FloatRange::gain_range(-30.0, 30.0))
+                .with_smoother(SmoothingStyle::Logarithmic(50.0))
+                .with_unit(" dB")
+                .with_value_to_string(v2s_f32_gain_to_db(2))
+                .with_string_to_value(s2v_f32_gain_to_db()),
+            frequency: FloatParam::new(
+                "Freq",
+                420.0,
+                FloatRange::Skewed {
+                    min: 1.0,
+                    max: 20000.0,
+                    factor: FloatRange::skew_factor(-2.0),
                 },
-                |err| eprintln!("Stream error: {err}"),
-                None,
             )
-            .unwrap();
-
-        stream.play().unwrap();
-        thread::sleep(Duration::from_secs(3));
-    }
-
-    #[test]
-    fn test_mlua() {
-        const FOURIER_ITER: usize = 3000;
-        const WAVE: &str = r#"
-        local phase = 0.0
-        
-        function process(freq, buffer, len)
-            for i = 1, len, CHANNELS do
-                local audio = 0.0
-                local radian = phase * (math.pi * 2.0)
-
-                for j = 1, FOURIER_ITER do
-                    audio = audio + math.sin(radian * j) / j
-                end
-
-                buffer[i] = audio
-                buffer[i + 1] = audio
-            
-                phase = (phase + freq / SAMPLE_RATE) % 1.0
-            end
-        end
-        "#;
-
-        let host = cpal::default_host();
-        let device = host.default_output_device().unwrap();
-
-        let config = device.default_output_config().unwrap();
-        let sample_rate = config.sample_rate() as usize;
-        let channels = config.channels() as usize;
-
-        let lua = Lua::new();
-        let globals = lua.globals();
-
-        globals.set("FOURIER_ITER", FOURIER_ITER).unwrap();
-        globals.set("SAMPLE_RATE", sample_rate).unwrap();
-        globals.set("CHANNELS", channels).unwrap();
-
-        lua.load(WAVE).exec().unwrap();
-
-        let lua_process = globals.get::<LuaFunction>("process").unwrap();
-
-        let (mut stream_producer, mut stream_consumer) =
-            RingBuffer::<f32>::new(channels * sample_rate);
-
-        let stream = device
-            .build_output_stream(
-                &config.into(),
-                move |data: &mut [f32], _| {
-                    let chunk = match stream_consumer.read_chunk(data.len()) {
-                        Ok(ch) => ch,
-                        Err(err) => {
-                            data.fill(0.0);
-                            eprintln!("{err:?}");
-                            return;
-                        }
-                    };
-                    let (first, second) = chunk.as_slices();
-                    let mid = first.len();
-                    data[..mid].copy_from_slice(first);
-                    data[mid..].copy_from_slice(second);
-                    chunk.commit_all();
-                },
-                |err| eprintln!("{err}"),
-                None,
-            )
-            .unwrap();
-
-        stream.play().unwrap();
-
-        let freq_start = 200.0;
-        let freq_end = 500.0;
-
-        let duration = 10.0;
-        let mut time = 0.0;
-        let dt = 1.0 / sample_rate as f32;
-        let amplitude = 0.2;
-
-        let lua_buffer = lua
-            .create_table_with_capacity(sample_rate * channels, 0)
-            .unwrap();
-
-        while time <= duration {
-            let freq = freq_start + (freq_end - freq_start) * (time / duration);
-            let buffer_size = (1.0 / freq * sample_rate as f32).round() as usize;
-
-            for i in 1..=buffer_size {
-                lua_buffer.raw_set(i, 0.0).unwrap();
-            }
-            lua_process
-                .call::<()>((freq, &lua_buffer, buffer_size))
-                .unwrap();
-            let mut buffer: Vec<f32> = Vec::with_capacity(buffer_size);
-            for i in 1..=buffer_size {
-                buffer.push(lua_buffer.raw_get(i).unwrap());
-            }
-
-            for data in &mut buffer {
-                *data *= amplitude;
-            }
-
-            loop {
-                match stream_producer.push_entire_slice(&buffer) {
-                    Ok(_) => break,
-                    Err(_) => thread::sleep(Duration::from_millis(1)),
-                }
-            }
-
-            time += buffer_size as f32 * dt;
+            .with_smoother(SmoothingStyle::Linear(10.0))
+            .with_value_to_string(v2s_f32_hz_then_khz(0))
+            .with_string_to_value(s2v_f32_hz_then_khz()),
+            use_midi: BoolParam::new("Use MIDI", false),
         }
-
-        thread::sleep(Duration::from_secs(1));
     }
 }
+
+impl Default for MyPlugin {
+    fn default() -> Self {
+        Self {
+            params: Arc::new(MyPluginParams::default()),
+            sample_rate: 1.0,
+            phase: 0.0,
+            midi_key_num: 0,
+            midi_note_freq: 1.0,
+            midi_note_gain: Smoother::new(SmoothingStyle::Linear(5.0)),
+        }
+    }
+}
+
+impl MyPlugin {
+    fn calculate_sine(&mut self, frequency: f32) -> f32 {
+        let phase_delta = frequency / self.sample_rate;
+        let sine = (self.phase * consts::TAU).sin();
+        self.phase += phase_delta;
+        if self.phase >= 1.0 {
+            self.phase -= 1.0;
+        }
+
+        sine
+    }
+}
+
+impl Plugin for MyPlugin {
+    const NAME: &'static str = "Synthoza";
+    const VENDOR: &'static str = "molor824";
+    const URL: &'static str = "https://github.com/molor824/Synthoza";
+    const EMAIL: &'static str = "info@example.com";
+    const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
+    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[
+        AudioIOLayout {
+            main_input_channels: NonZeroU32::new(2),
+            main_output_channels: NonZeroU32::new(2),
+            aux_input_ports: &[],
+            aux_output_ports: &[],
+            names: PortNames::const_default(),
+        },
+        AudioIOLayout {
+            main_input_channels: NonZeroU32::new(1),
+            main_output_channels: NonZeroU32::new(1),
+            ..AudioIOLayout::const_default()
+        },
+    ];
+
+    const MIDI_INPUT: MidiConfig = MidiConfig::Basic;
+    const SAMPLE_ACCURATE_AUTOMATION: bool = true;
+
+    type Editor = ();
+    type SysExMessage = ();
+    type BackgroundTask = ();
+
+    fn activate(
+        &mut self,
+        _audio_io_layout: &AudioIOLayout,
+        buffer_config: &BufferConfig,
+        _context: &mut impl ActivateContext<Self>,
+    ) -> bool {
+        self.sample_rate = buffer_config.sample_rate;
+        true
+    }
+
+    fn params(&self) -> Arc<dyn Params> {
+        self.params.clone()
+    }
+
+    fn reset(&mut self) {
+        self.phase = 0.0;
+        self.midi_key_num = 0;
+        self.midi_note_freq = 1.0;
+        self.midi_note_gain.reset(0.0);
+    }
+
+    fn process(
+        &mut self,
+        buffer: &mut Buffer,
+        _aux: &mut AuxiliaryBuffers,
+        context: &mut impl ProcessContext<Self>,
+    ) -> ProcessStatus {
+        let mut next_event = context.next_event();
+
+        for (sample_id, channel_samples) in buffer.iter_samples().enumerate() {
+            let gain = self.params.gain.smoothed.next();
+            let sine = if self.params.use_midi.value() {
+                while let Some(event) = next_event {
+                    if event.timing() > sample_id as u32 {
+                        break;
+                    }
+
+                    match event {
+                        NoteEvent::NoteOn { key, velocity, .. } => {
+                            self.midi_key_num = key.number_or_middle_c();
+                            self.midi_note_freq = midi_key_to_freq(self.midi_key_num);
+                            self.midi_note_gain.set_target(self.sample_rate, velocity);
+                        }
+                        NoteEvent::NoteOff { key, .. } if key == Key::Number(self.midi_key_num) => {
+                            self.midi_note_gain.set_target(self.sample_rate, 0.0);
+                        }
+                        NoteEvent::PolyPressure { key, pressure, .. }
+                            if key == Key::Number(self.midi_key_num) =>
+                        {
+                            self.midi_note_gain.set_target(self.sample_rate, pressure);
+                        }
+                        _ => {}
+                    }
+                    next_event = context.next_event();
+                }
+                self.calculate_sine(self.midi_note_freq) * self.midi_note_gain.next()
+            } else {
+                let frequency = self.params.frequency.smoothed.next();
+                self.calculate_sine(frequency)
+            };
+
+            for sample in channel_samples {
+                *sample = sine * db_to_gain_fast(gain);
+            }
+        }
+
+        ProcessStatus::KeepAlive
+    }
+
+    fn deactivate(&mut self) {}
+}
+
+impl ClapPlugin for MyPlugin {
+    const CLAP_ID: &'static str = "synthoza";
+    const CLAP_DESCRIPTION: Option<&'static str> = Some("Make music via programming.");
+    const CLAP_MANUAL_URL: Option<&'static str> = Some(Self::URL);
+    const CLAP_SUPPORT_URL: Option<&'static str> = None;
+    const CLAP_FEATURES: &'static [ClapFeature] = &[ClapFeature::AudioEffect, ClapFeature::Stereo];
+}
+
+nice_export_clap!(MyPlugin);
