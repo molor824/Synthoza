@@ -8,8 +8,10 @@ use nice_plug::{
 };
 use std::{f32::consts, sync::Arc};
 
-pub struct MyPlugin {
-    params: Arc<MyPluginParams>,
+mod ui;
+
+pub struct MainPlugin {
+    params: Arc<PluginParams>,
     sample_rate: f32,
     phase: f32,
     midi_key_num: u8,
@@ -17,8 +19,8 @@ pub struct MyPlugin {
     midi_note_gain: Smoother<f32>,
 }
 
-#[derive(Params)]
-struct MyPluginParams {
+#[derive(Debug, Params)]
+struct PluginParams {
     #[id = "gain"]
     pub gain: FloatParam,
     #[id = "freq"]
@@ -26,7 +28,7 @@ struct MyPluginParams {
     #[id = "usemid"]
     pub use_midi: BoolParam,
 }
-impl Default for MyPluginParams {
+impl Default for PluginParams {
     fn default() -> Self {
         Self {
             gain: FloatParam::new("Gain", db_to_gain(0.0), FloatRange::gain_range(-30.0, 30.0))
@@ -51,10 +53,10 @@ impl Default for MyPluginParams {
     }
 }
 
-impl Default for MyPlugin {
+impl Default for MainPlugin {
     fn default() -> Self {
         Self {
-            params: Arc::new(MyPluginParams::default()),
+            params: Arc::new(PluginParams::default()),
             sample_rate: 1.0,
             phase: 0.0,
             midi_key_num: 0,
@@ -64,7 +66,7 @@ impl Default for MyPlugin {
     }
 }
 
-impl MyPlugin {
+impl MainPlugin {
     fn calculate_sine(&mut self, frequency: f32) -> f32 {
         let phase_delta = frequency / self.sample_rate;
         let sine = (self.phase * consts::TAU).sin();
@@ -77,7 +79,7 @@ impl MyPlugin {
     }
 }
 
-impl Plugin for MyPlugin {
+impl Plugin for MainPlugin {
     const NAME: &'static str = "Synthoza";
     const VENDOR: &'static str = "molor824";
     const URL: &'static str = "https://github.com/molor824/Synthoza";
@@ -88,9 +90,7 @@ impl Plugin for MyPlugin {
         AudioIOLayout {
             main_input_channels: NonZeroU32::new(2),
             main_output_channels: NonZeroU32::new(2),
-            aux_input_ports: &[],
-            aux_output_ports: &[],
-            names: PortNames::const_default(),
+            ..AudioIOLayout::const_default()
         },
         AudioIOLayout {
             main_input_channels: NonZeroU32::new(1),
@@ -178,12 +178,22 @@ impl Plugin for MyPlugin {
     fn deactivate(&mut self) {}
 }
 
-impl ClapPlugin for MyPlugin {
-    const CLAP_ID: &'static str = "synthoza";
+impl ClapPlugin for MainPlugin {
+    const CLAP_ID: &'static str = "Synthoza";
     const CLAP_DESCRIPTION: Option<&'static str> = Some("Make music via programming.");
     const CLAP_MANUAL_URL: Option<&'static str> = Some(Self::URL);
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
-    const CLAP_FEATURES: &'static [ClapFeature] = &[ClapFeature::AudioEffect, ClapFeature::Stereo];
+    const CLAP_FEATURES: &'static [ClapFeature] = &[
+        ClapFeature::Instrument,
+        ClapFeature::Synthesizer,
+        ClapFeature::Stereo,
+    ];
 }
 
-nice_export_clap!(MyPlugin);
+impl Vst3Plugin for MainPlugin {
+    const VST3_CLASS_ID: [u8; 16] = *b"Synthoza\0\0\0\0\0\0\0\0";
+    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[Vst3SubCategory::Fx];
+}
+
+nice_export_clap!(MainPlugin);
+nice_export_vst3!(MainPlugin);

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 nice-plug = "0.4.2"
+nice-plug-iced = "0.5.0"
 
 [lib]
 crate-type = ["cdylib"]
